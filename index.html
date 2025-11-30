@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>환율 계산기</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💱</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e88e5 0%, #0d47a1 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            transition: background 0.5s ease;
+        }
+
+        body.hana-theme {
+            background: linear-gradient(135deg, #008485 0%, #00A896 100%);
+        }
+
+        .calculator {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            display: none;
+        }
+
+        /* 탭 스타일 */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab-button {
+            padding: 10px 25px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: #666;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: -2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tab-logo {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+        }
+
+        .tab-button:hover {
+            color: #1e88e5;
+        }
+
+        .tab-button.active {
+            color: #1e88e5;
+            border-bottom-color: #1e88e5;
+        }
+
+        body.hana-theme .tab-button:hover {
+            color: #008485;
+        }
+
+        body.hana-theme .tab-button.active {
+            color: #008485;
+            border-bottom-color: #008485;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        iframe {
+            width: 100%;
+            border: none;
+            height: 85vh;
+        }
+
+        /* 플로팅 계산기 버튼 */
+        .floating-calc-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 12px 24px;
+            border-radius: 30px;
+            background: linear-gradient(135deg, #ff9500 0%, #ff6b00 100%);
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 107, 0, 0.4);
+            transition: all 0.3s ease;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .floating-calc-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 0, 0.6);
+        }
+
+        /* 계산기 위젯 */
+        .calculator-widget {
+            position: fixed;
+            top: 50%;
+            right: 2%;
+            transform: translateY(-50%);
+            width: 267px;
+            height: 423px;
+            border-radius: 11px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 1000;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        .calculator-widget.active {
+            display: block;
+        }
+
+        .calculator-widget iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 11px;
+            pointer-events: auto;
+        }
+
+        /* 드래그 핸들 */
+        .drag-handle {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            cursor: move;
+            z-index: 1001;
+            background: transparent;
+        }
+
+        /* 생일 팝업 스타일 */
+        .birthday-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            z-index: 2000;
+            max-width: 230px;
+            animation: slideIn 0.5s ease-out;
+            display: none;
+        }
+
+        .birthday-popup.show {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .birthday-popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .birthday-popup-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff6b6b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .birthday-popup-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .birthday-popup-close:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .birthday-popup-content {
+            text-align: center;
+        }
+
+        .birthday-popup-emoji {
+            width: 140px;
+            height: 140px;
+            margin: 15px auto;
+            display: block;
+        }
+
+        .birthday-popup-text {
+            font-size: 15px;
+            color: #333;
+            line-height: 1.6;
+            margin-top: 10px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <h1>환율 계산기</h1>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('unipass')">
+                <img src="uni-logo.png" alt="관세청" class="tab-logo">
+                관세청 (UNIPASS)
+            </button>
+            <button class="tab-button" onclick="switchTab('hana')">
+                <img src="hana-logo.png" alt="하나은행" class="tab-logo">
+                하나은행
+            </button>
+        </div>
+
+        <div id="unipass-tab" class="tab-content active">
+            <iframe src="unipass/index.html" id="unipass-frame"></iframe>
+        </div>
+
+        <div id="hana-tab" class="tab-content">
+            <iframe src="hana/index.html" id="hana-frame"></iframe>
+        </div>
+    </div>
+
+    <!-- 플로팅 계산기 버튼 -->
+    <button class="floating-calc-button" onclick="openCalculator()">🔢 계산기 (key : ₩)</button>
+
+    <!-- 계산기 위젯 -->
+    <div id="calculator-widget" class="calculator-widget">
+        <div class="drag-handle" id="drag-handle"></div>
+        <iframe src="calculator/index.html" id="calculator-frame"></iframe>
+    </div>
+
+    <!-- 생일 팝업 -->
+    <div id="birthday-popup" class="birthday-popup">
+        <div class="birthday-popup-header">
+            <div class="birthday-popup-title">💡 TIP</div>
+            <button class="birthday-popup-close" onclick="closeBirthdayPopup()">×</button>
+        </div>
+        <div class="birthday-popup-content">
+            <img src="emoji.gif" alt="생일 축하" class="birthday-popup-emoji">
+            <p class="birthday-popup-text">11월 17일은 김슬님의 생일이라는 점 모두 알고 계셨나요?</p>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            // 모든 탭 버튼 비활성화
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // 모든 탭 콘텐츠 숨기기
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // 선택된 탭 활성화 및 테마 변경
+            if (tab === 'hana') {
+                document.querySelector('[onclick="switchTab(\'hana\')"]').classList.add('active');
+                document.getElementById('hana-tab').classList.add('active');
+                document.body.classList.add('hana-theme');
+            } else {
+                document.querySelector('[onclick="switchTab(\'unipass\')"]').classList.add('active');
+                document.getElementById('unipass-tab').classList.add('active');
+                document.body.classList.remove('hana-theme');
+            }
+
+            // localStorage에 현재 탭 저장
+            localStorage.setItem('activeTab', tab);
+        }
+
+        // 페이지 로드 시 마지막 선택한 탭 복원
+        window.addEventListener('DOMContentLoaded', () => {
+            const lastTab = localStorage.getItem('activeTab') || 'unipass';
+            switchTab(lastTab);
+        });
+
+        // 계산기 위젯 열기/닫기
+        function openCalculator() {
+            const widget = document.getElementById('calculator-widget');
+
+            if (widget.classList.contains('active')) {
+                widget.classList.remove('active');
+            } else {
+                widget.classList.add('active');
+
+                // 저장된 위치가 있는지 확인
+                const savedPosition = localStorage.getItem('calculator-position');
+                let useDefaultPosition = true;
+
+                if (savedPosition) {
+                    try {
+                        const position = JSON.parse(savedPosition);
+                        const left = parseInt(position.left);
+                        const top = parseInt(position.top);
+
+                        // 화면 크기
+                        const viewportWidth = window.innerWidth;
+                        const viewportHeight = window.innerHeight;
+                        const widgetWidth = 267;
+                        const widgetHeight = 423;
+
+                        // 저장된 위치가 화면 내에 있는지 확인
+                        const isInViewport =
+                            left >= 0 &&
+                            top >= 0 &&
+                            left + widgetWidth <= viewportWidth &&
+                            top + widgetHeight <= viewportHeight;
+
+                        if (isInViewport) {
+                            // 화면 내에 있으면 저장된 위치 복원
+                            widget.style.left = position.left;
+                            widget.style.top = position.top;
+                            widget.style.right = 'auto';
+                            widget.style.transform = 'none';
+                            useDefaultPosition = false;
+                        }
+                    } catch (e) {
+                        // JSON 파싱 오류 시 기본 위치 사용
+                        console.error('Failed to parse calculator position:', e);
+                    }
+                }
+
+                if (useDefaultPosition) {
+                    // 기본 위치 (우측 2%)
+                    widget.style.transform = 'translateY(-50%)';
+                    widget.style.top = '50%';
+                    widget.style.right = '2%';
+                    widget.style.left = 'auto';
+                }
+
+                widget.style.width = '267px';
+                widget.style.height = '423px';
+
+                // iframe에 포커스 주기 (키보드 입력 바로 가능하도록)
+                setTimeout(() => {
+                    const iframe = document.getElementById('calculator-frame');
+                    if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.focus();
+                    }
+                }, 100);
+            }
+        }
+
+        // 드래그 기능
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        const widget = document.getElementById('calculator-widget');
+        const dragHandle = document.getElementById('drag-handle');
+
+        dragHandle.addEventListener('mousedown', dragStart);
+        dragHandle.addEventListener('touchstart', dragStart);
+
+        function dragStart(e) {
+            e.preventDefault();
+
+            // 현재 위젯의 실제 위치 가져오기
+            const rect = widget.getBoundingClientRect();
+
+            // 마우스 클릭 위치와 위젯 좌상단 간의 오프셋 계산
+            if (e.type === 'touchstart') {
+                dragOffsetX = e.touches[0].clientX - rect.left;
+                dragOffsetY = e.touches[0].clientY - rect.top;
+            } else {
+                dragOffsetX = e.clientX - rect.left;
+                dragOffsetY = e.clientY - rect.top;
+            }
+
+            // right/transform 제거하고 left/top으로 전환
+            widget.style.right = 'auto';
+            widget.style.transform = 'none';
+            widget.style.left = rect.left + 'px';
+            widget.style.top = rect.top + 'px';
+
+            isDragging = true;
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', dragEnd);
+            document.addEventListener('touchmove', drag);
+            document.addEventListener('touchend', dragEnd);
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+
+            e.preventDefault();
+
+            let clientX, clientY;
+            if (e.type === 'touchmove') {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            // 새 위치 계산 (마우스 위치 - 오프셋)
+            let newLeft = clientX - dragOffsetX;
+            let newTop = clientY - dragOffsetY;
+
+            // 경계 체크
+            const widgetWidth = widget.offsetWidth;
+            const widgetHeight = widget.offsetHeight;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            newLeft = Math.max(0, Math.min(viewportWidth - widgetWidth, newLeft));
+            newTop = Math.max(0, Math.min(viewportHeight - widgetHeight, newTop));
+
+            widget.style.left = newLeft + 'px';
+            widget.style.top = newTop + 'px';
+        }
+
+        function dragEnd(e) {
+            if (!isDragging) return;
+
+            isDragging = false;
+
+            // 드래그 종료 시 위치 저장
+            localStorage.setItem('calculator-position', JSON.stringify({
+                left: widget.style.left,
+                top: widget.style.top
+            }));
+
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', dragEnd);
+            document.removeEventListener('touchmove', drag);
+            document.removeEventListener('touchend', dragEnd);
+        }
+
+        // 생일 팝업 관련 함수
+        let isBirthdayPopupClosed = false; // 현재 세션에서만 유지
+
+        function checkBirthdayPopup() {
+            const now = new Date();
+            const month = now.getMonth() + 1; // 0-11이므로 +1
+            const date = now.getDate();
+
+            // 11월 10일부터 11월 17일까지 체크
+            const isInDateRange = (month === 11 && date >= 10 && date <= 17);
+
+            // 날짜 범위에 있고, 현재 세션에서 아직 닫지 않았다면 팝업 표시
+            if (isInDateRange && !isBirthdayPopupClosed) {
+                setTimeout(() => {
+                    document.getElementById('birthday-popup').classList.add('show');
+                }, 500); // 페이지 로드 후 0.5초 뒤에 팝업 표시
+            }
+        }
+
+        function closeBirthdayPopup() {
+            const popup = document.getElementById('birthday-popup');
+            popup.classList.remove('show');
+
+            // 현재 세션에서만 닫힌 상태 유지 (새로고침하면 다시 나타남)
+            isBirthdayPopupClosed = true;
+        }
+
+        // 페이지 로드 시 생일 팝업 체크
+        window.addEventListener('DOMContentLoaded', () => {
+            checkBirthdayPopup();
+        });
+
+        // 키보드 단축키: 백슬래시(\) 키로 계산기 열기
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '\\') {
+                e.preventDefault();
+                openCalculator();
+            }
+        });
+
+        // 계산기 iframe으로부터 메시지 받기
+        window.addEventListener('message', (e) => {
+            if (e.data === 'toggleCalculator') {
+                openCalculator();
+            }
+        });
+    </script>
+</body>
+</html>

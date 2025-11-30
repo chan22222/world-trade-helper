@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수입 환율 계산기</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💱</text></svg>">
+    <!-- API 설정 파일 로드 -->
+    <script src="config.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e88e5 0%, #0d47a1 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .calculator {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 18px;
+                margin-bottom: 15px;
+            }
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 30px;
+        }
+
+        @media (max-width: 968px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 계산기 섹션 */
+        .calculator-section {
+            padding: 0;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: flex-end;  /* 하단 정렬로 높이 맞춤 */
+        }
+
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 환율 위젯 */
+        .rate-widget {
+            background: linear-gradient(135deg, #1e88e5 0%, #0d47a1 100%);
+            border-radius: 16px;
+            padding: 25px;
+            color: white;
+            position: sticky;
+            top: 20px;
+        }
+
+        .rate-widget-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rate-widget-date {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .rate-item {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .rate-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .rate-currency {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .rate-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .rate-label {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 3px;
+        }
+
+        .api-status {
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            text-align: center;
+            margin-top: 10px;
+            margin-bottom: 15px;  /* 아래 여백 추가 */
+            display: none;
+        }
+
+        .api-status.loading {
+            display: block;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .api-status.success {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .api-status.error {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .api-status.cached {
+            display: block;
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input[type="date"],
+        input[type="number"],
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="date"]:focus,
+        input[type="number"]:focus,
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #1e88e5;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper input {
+            padding-right: 40px;
+        }
+
+        .clear-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #999;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 1;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .clear-btn:hover {
+            background: #666;
+        }
+
+        /* 계산기 섹션 */
+        .calculate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #1e88e5 0%, #0d47a1 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 20px;
+        }
+
+        .calculate-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .calculate-btn:active {
+            transform: translateY(0);
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        .result-header {
+            color: #1e88e5;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        #resultList {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        @media (max-width: 768px) {
+            #resultList {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .result-item {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 15px;
+            transition: all 0.3s;
+        }
+
+        .result-item:hover {
+            border-color: #1e88e5;
+            box-shadow: 0 4px 12px rgba(30, 136, 229, 0.1);
+        }
+
+        .result-currency {
+            font-size: 13px;
+            color: #1e88e5;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .result-amount {
+            font-size: 26px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .result-rate {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .info-message {
+            background: #e3f2fd;
+            border-left: 3px solid #1e88e5;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #555;
+            line-height: 1.5;
+        }
+
+        .saved-dates {
+            margin-top: 15px;
+        }
+
+        .saved-dates-toggle {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .saved-dates-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .saved-dates-list {
+            display: none;
+            margin-top: 8px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .saved-dates-list.show {
+            display: block;
+        }
+
+        .saved-dates-title {
+            font-weight: 600;
+            color: white;
+            margin-bottom: 6px;
+            font-size: 11px;
+        }
+
+        .saved-date-item {
+            padding: 5px 8px;
+            margin-bottom: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 11px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .saved-date-item:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(3px);
+        }
+
+        .delete-date-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .delete-date-btn:hover {
+            background: #c82333;
+        }
+
+        /* 화폐 선택 버튼 (label 옆) */
+        .currency-select-btn {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 4px 10px;
+            background: #1e88e5;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: normal;
+        }
+
+        .currency-select-btn:hover {
+            background: #0d47a1;
+        }
+
+        /* 모달 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .modal-close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .modal-close-btn:hover {
+            color: #333;
+        }
+
+        .currency-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .currency-checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .currency-checkbox-item:hover {
+            background: #e9ecef;
+        }
+
+        .currency-checkbox-item input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        .currency-checkbox-item label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: normal;
+            font-size: 13px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <h1>수입 환율 계산기 (관세청 - UNIPASS API)</h1>
+
+        <div class="main-content">
+            <!-- 왼쪽: 계산기 섹션 -->
+            <div class="calculator-section">
+                <div class="form-group">
+                    <label for="date">날짜</label>
+                    <input type="date" id="date" required onchange="fetchRatesOnDateChange()">
+                </div>
+
+                <div id="api-status" class="api-status"></div>
+
+                <div class="form-row">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="fromCurrency">
+                            통화 선택
+                            <button type="button" class="currency-select-btn" onclick="openCurrencyModal()">화폐 선택</button>
+                        </label>
+                        <select id="fromCurrency">
+                            <option value="KRW">원 (KRW)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="amount">금액</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="amount" placeholder="금액을 입력하세요" required>
+                            <button type="button" class="clear-btn" id="clearAmount">×</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="calculate-btn" onclick="calculate()">계산하기</button>
+
+                <div class="result" id="result">
+                    <div class="result-header">환전 결과</div>
+                    <div id="resultList"></div>
+                </div>
+
+                <div class="info-message" style="margin-top: 20px;">
+                    날짜를 선택하면 자동으로 API에서 기준환율을 불러옵니다.<br>
+                    불러온 환율은 캐시에 저장되어 다음번에는 즉시 로드됩니다.
+                </div>
+            </div>
+
+            <!-- 오른쪽: 환율 정보 위젯 -->
+            <div class="rate-widget">
+                <div class="rate-widget-title">기준환율</div>
+                <div class="rate-widget-date" id="widget-date">날짜를 선택하세요</div>
+
+                <!-- 환율 항목들은 동적으로 생성됨 -->
+
+                <!-- 저장된 날짜 목록 -->
+                <div class="saved-dates">
+                    <button class="saved-dates-toggle" onclick="toggleSavedDates()">
+                        저장된 환율 날짜 보기 (<span id="saved-count">0</span>)
+                    </button>
+                    <div class="saved-dates-list" id="saved-dates-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 화폐 선택 모달 -->
+    <div class="modal-overlay" id="currencyModal" onclick="closeModalOnOverlay(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 class="modal-title">자주 쓰는 화폐 선택</h2>
+                <button class="modal-close-btn" onclick="closeCurrencyModal()">&times;</button>
+            </div>
+            <div id="currency-checkboxes" class="currency-checkboxes">
+                <!-- 동적으로 생성됨 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 현재 로드된 환율 데이터
+        let currentRates = null;
+        let allCurrencies = {}; // 모든 화폐 정보 저장
+        let selectedCurrencies = ['USD', 'EUR', 'CHF']; // 기본 선택된 화폐
+
+        // 초기화
+        document.getElementById('date').valueAsDate = new Date();
+
+        // localStorage에서 선호 화폐 불러오기
+        function loadSelectedCurrencies() {
+            const saved = localStorage.getItem(CONFIG.SELECTED_CURRENCIES_KEY);
+            if (saved) {
+                selectedCurrencies = JSON.parse(saved);
+            }
+
+            // 화폐 이름 정보 불러오기
+            const savedNames = localStorage.getItem(CONFIG.CURRENCY_NAMES_KEY);
+            if (savedNames) {
+                allCurrencies = JSON.parse(savedNames);
+            }
+        }
+
+        // localStorage에 선호 화폐 저장
+        function saveSelectedCurrencies() {
+            localStorage.setItem(CONFIG.SELECTED_CURRENCIES_KEY, JSON.stringify(selectedCurrencies));
+        }
+
+        // 모달 열기
+        function openCurrencyModal() {
+            const modal = document.getElementById('currencyModal');
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden'; // 스크롤 방지
+        }
+
+        // 모달 닫기
+        function closeCurrencyModal() {
+            const modal = document.getElementById('currencyModal');
+            modal.classList.remove('show');
+            document.body.style.overflow = ''; // 스크롤 복원
+        }
+
+        // 오버레이 클릭 시 모달 닫기
+        function closeModalOnOverlay(event) {
+            if (event.target.id === 'currencyModal') {
+                closeCurrencyModal();
+            }
+        }
+
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeCurrencyModal();
+            }
+        });
+
+        // 체크박스 렌더링
+        function renderCurrencyCheckboxes() {
+            const container = document.getElementById('currency-checkboxes');
+
+            if (Object.keys(allCurrencies).length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">날짜를 선택하여 환율을 먼저 불러와주세요</p>';
+                return;
+            }
+
+            let html = '';
+            const sortedCurrencies = Object.keys(allCurrencies).sort();
+
+            sortedCurrencies.forEach(code => {
+                const detailedName = getDetailedCurrencyName(code);
+                const checked = selectedCurrencies.includes(code) ? 'checked' : '';
+                html += `
+                    <div class="currency-checkbox-item">
+                        <input type="checkbox" id="curr-${code}" value="${code}" ${checked} onchange="updateCurrencySelections()">
+                        <label for="curr-${code}">${detailedName} (${code})</label>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 체크박스 변경 시 처리
+        function updateCurrencySelections() {
+            const checkboxes = document.querySelectorAll('#currency-checkboxes input[type="checkbox"]');
+            selectedCurrencies = [];
+
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    selectedCurrencies.push(checkbox.value);
+                }
+            });
+
+            saveSelectedCurrencies();
+            updateCurrencyDropdown();
+            updateRateWidget();
+        }
+
+        // 통화 선택 드롭다운 업데이트
+        function updateCurrencyDropdown() {
+            const dropdown = document.getElementById('fromCurrency');
+            const currentValue = dropdown.value;
+
+            // KRW는 항상 포함
+            let html = '<option value="KRW">원 (KRW)</option>';
+
+            selectedCurrencies.forEach(code => {
+                const detailedName = getDetailedCurrencyName(code);
+                html += `<option value="${code}">${detailedName} (${code})</option>`;
+            });
+
+            dropdown.innerHTML = html;
+
+            // 이전 선택 값 유지 (가능한 경우)
+            if (currentValue === 'KRW' || selectedCurrencies.includes(currentValue)) {
+                dropdown.value = currentValue;
+            }
+        }
+
+        // 환율 위젯 업데이트 (선택된 화폐만 표시)
+        function updateRateWidget() {
+            const widgetContainer = document.querySelector('.rate-widget');
+            const date = document.getElementById('date').value;
+
+            // 기존 환율 항목 제거 (저장된 날짜 부분 제외)
+            const existingItems = widgetContainer.querySelectorAll('.rate-item');
+            existingItems.forEach(item => item.remove());
+
+            if (!currentRates || selectedCurrencies.length === 0) {
+                return;
+            }
+
+            // 날짜 표시 바로 다음에 환율 항목 추가
+            const dateElement = document.getElementById('widget-date');
+
+            selectedCurrencies.forEach(code => {
+                const rate = currentRates[code];
+                const detailedName = getDetailedCurrencyName(code);
+                const symbol = getCurrencySymbol(code);
+
+                const rateItem = document.createElement('div');
+                rateItem.className = 'rate-item';
+                rateItem.innerHTML = `
+                    <div class="rate-currency">${symbol} ${detailedName} (${code})</div>
+                    <div class="rate-value">${rate ? rate.toFixed(2) : '-'}</div>
+                    <div class="rate-label">원</div>
+                `;
+
+                // 저장된 날짜 섹션 전에 삽입
+                const savedDatesSection = widgetContainer.querySelector('.saved-dates');
+                widgetContainer.insertBefore(rateItem, savedDatesSection);
+            });
+        }
+
+        // 페이지 로드 시 초기화
+        loadSelectedCurrencies();
+
+        // X 버튼 클릭 시 금액 지우기
+        const clearBtn = document.getElementById('clearAmount');
+        document.getElementById('clearAmount').addEventListener('click', function() {
+            document.getElementById('amount').value = '';
+            clearBtn.style.display = 'none';
+            document.getElementById('amount').focus();
+        });
+
+        // 금액 입력 필드에 쉼표 추가
+        const amountInput = document.getElementById('amount');
+
+        // X 버튼 표시/숨김 처리
+        function updateClearButton() {
+            if (amountInput.value) {
+                clearBtn.style.display = 'flex';
+            } else {
+                clearBtn.style.display = 'none';
+            }
+        }
+
+        amountInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/,/g, '');
+            updateClearButton();
+
+            // 숫자, 소수점만 허용
+            if (value && !/^[\d.]*$/.test(value)) {
+                value = value.replace(/[^\d.]/g, '');
+            }
+
+            // 소수점이 있는지 확인
+            if (value.includes('.')) {
+                const parts = value.split('.');
+                const integerPart = parts[0];
+                const decimalPart = parts[1] || '';
+
+                // 정수 부분에만 쉼표 추가
+                if (integerPart) {
+                    const formatted = parseInt(integerPart).toLocaleString('en-US');
+                    e.target.value = formatted + '.' + decimalPart;
+                } else {
+                    e.target.value = '.' + decimalPart;
+                }
+            } else if (value && !isNaN(value)) {
+                e.target.value = parseInt(value).toLocaleString('en-US');
+            } else {
+                e.target.value = value;
+            }
+        });
+
+        amountInput.addEventListener('blur', function(e) {
+            let value = e.target.value.replace(/,/g, '');
+            if (value && !isNaN(value) && value !== '.') {
+                e.target.value = parseFloat(value).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
+            updateClearButton();
+        });
+
+        amountInput.addEventListener('focus', function(e) {
+            updateClearButton();
+        });
+
+        // 위젯 업데이트
+        function updateWidget(date, rates) {
+            document.getElementById('widget-date').textContent = date;
+
+            // 계산에 사용할 현재 환율 저장
+            currentRates = rates;
+
+            // 체크박스와 위젯 업데이트
+            renderCurrencyCheckboxes();
+            updateCurrencyDropdown();
+            updateRateWidget();
+        }
+
+        // 날짜 변경 시 환율 자동 불러오기 (캐시 확인 후 API 호출)
+        function fetchRatesOnDateChange() {
+            const date = document.getElementById('date').value;
+
+            if (!date) {
+                return;
+            }
+
+            const key = `${CONFIG.CACHE_PREFIX}${date}`;
+            const cachedRates = localStorage.getItem(key);
+
+            // 캐시에 데이터가 있으면 캐시 사용
+            if (cachedRates) {
+                const rates = JSON.parse(cachedRates);
+                updateWidget(date, rates);
+                showStatus('cached', `캐시에서 불러왔습니다 (${date})`);
+                return;
+            }
+
+            // 캐시에 없으면 API 호출
+            fetchRatesFromAPI(date);
+        }
+
+        // API 상태 표시
+        function showStatus(type, message) {
+            const statusEl = document.getElementById('api-status');
+            statusEl.className = `api-status ${type}`;
+            statusEl.textContent = message;
+
+            // 성공/캐시 메시지는 3초 후 숨김
+            if (type === 'success' || type === 'cached') {
+                setTimeout(() => {
+                    statusEl.className = 'api-status';
+                }, 3000);
+            }
+        }
+
+        // XML 데이터 처리 함수 (API 응답용)
+        function processXMLData(text, date) {
+            console.group('📦 XML 데이터 처리 중 (API 응답)');
+            console.log('📝 응답 데이터 길이:', text.length, 'bytes');
+            console.log('📄 응답 데이터 시작 부분:', text.substring(0, 300));
+
+            // XML 파싱
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, 'text/xml');
+
+            // 파싱 에러 체크
+            const parseError = xmlDoc.querySelector('parsererror');
+            if (parseError) {
+                console.error('❌ XML 파싱 실패');
+                console.error('파싱 에러 내용:', parseError.textContent);
+                console.error('원본 데이터:', text.substring(0, 500));
+                console.groupEnd();
+                throw new Error('XML 파싱 오류: ' + parseError.textContent);
+            }
+
+            // API 에러 체크
+            const resultCode = xmlDoc.querySelector('resultCode');
+            const resultMsg = xmlDoc.querySelector('resultMsg');
+
+            console.log('🔍 API 응답 코드:', resultCode?.textContent || '없음');
+            console.log('📋 API 응답 메시지:', resultMsg?.textContent || '없음');
+
+            if (resultCode && resultCode.textContent !== '00') {
+                const errorMsg = resultMsg?.textContent || '알 수 없는 오류';
+                console.error('❌ API 에러 발생');
+                console.error('에러 코드:', resultCode.textContent);
+                console.error('에러 메시지:', errorMsg);
+                console.groupEnd();
+
+                // 에러 코드별 자세한 설명
+                let detailedError = `API 오류 [${resultCode.textContent}]: ${errorMsg}\n\n`;
+                if (resultCode.textContent === '30') {
+                    detailedError += '원인: 등록되지 않은 서비스 키이거나 활성화되지 않은 키입니다.';
+                } else if (resultCode.textContent === '31') {
+                    detailedError += '원인: 일일 트래픽 제한을 초과했습니다.';
+                } else if (resultCode.textContent === '32') {
+                    detailedError += '원인: API 서비스가 일시적으로 중지되었습니다.';
+                }
+
+                showStatus('error', detailedError);
+                throw new Error(detailedError);
+            }
+
+            // 환율 데이터 추출 (API는 기존 형식 사용)
+            const items = xmlDoc.querySelectorAll('item');
+            console.log('📊 환율 데이터 개수:', items.length, '개');
+
+            if (items.length === 0) {
+                console.warn('⚠️ 환율 데이터가 없습니다');
+                console.log('가능한 원인:');
+                console.log('  - 주말 또는 공휴일 날짜');
+                console.log('  - 아직 데이터가 업데이트되지 않은 미래 날짜');
+                console.log('  - 잘못된 날짜 형식');
+                console.groupEnd();
+                showStatus('error', '해당 날짜의 환율 데이터가 없습니다 (주말/공휴일 또는 데이터 미제공 날짜)');
+                return null;
+            }
+
+            // 통화별 환율 맵핑 (API 형식: currSgn, curr, fxrt)
+            const rates = {};
+            const currencyNames = {};
+
+            items.forEach((item, index) => {
+                const currCode = item.querySelector('currSgn')?.textContent;
+                const currName = item.querySelector('curr')?.textContent;
+                const baseRate = parseFloat(item.querySelector('fxrt')?.textContent);
+
+                if (currCode && !isNaN(baseRate)) {
+                    rates[currCode] = baseRate;
+                    currencyNames[currCode] = currName || currCode;
+
+                    if (index < 5) {
+                        console.log(`  ${index + 1}. ${currCode}: ${baseRate} (${currName})`);
+                    }
+                }
+            });
+
+            if (items.length > 5) {
+                console.log(`  ... 외 ${items.length - 5}개 통화`);
+            }
+
+            // localStorage에 캐시 저장
+            const key = `${CONFIG.CACHE_PREFIX}${date}`;
+            localStorage.setItem(key, JSON.stringify(rates));
+            console.log('💾 캐시 저장 완료:', key);
+
+            // 화폐 이름 정보도 저장
+            localStorage.setItem(CONFIG.CURRENCY_NAMES_KEY, JSON.stringify(currencyNames));
+
+            // 전역 변수에 저장
+            allCurrencies = currencyNames;
+
+            // 위젯 업데이트
+            updateWidget(date, rates);
+
+            showStatus('success', 'API에서 환율 데이터를 불러왔습니다 (' + items.length + '개 통화)');
+            updateSavedDatesList();
+
+            console.log('✅ API 데이터 처리 완료');
+            console.groupEnd();
+
+            return rates;
+        }
+
+        // JSON 데이터 처리 함수 (웹 파싱용)
+        function processJSONData(jsonData, date) {
+            console.group('📦 JSON 데이터 처리 중 (웹 파싱)');
+
+            const rates = {};
+            const currencyNames = {};
+
+            // 웹 파싱 형식: currCd, currNm, weekFxrt
+            if (jsonData && jsonData.items) {
+                console.log('📊 JSON 데이터 발견! 레코드 수:', jsonData.items.length);
+                console.log('📅 조회 기간:', jsonData.aplyDtStrtDd, '~', jsonData.aplyDtEndDd);
+
+                jsonData.items.forEach(record => {
+                    const currCode = record.currCd;  // 웹: currCd
+                    const currName = record.currNm;  // 웹: currNm
+                    const baseRate = parseFloat(record.weekFxrt);  // 웹: weekFxrt
+
+                    if (currCode && !isNaN(baseRate)) {
+                        rates[currCode] = baseRate;
+                        currencyNames[currCode] = currName || currCode;
+                    }
+                });
+            }
+            // 이전 버전 호환성 (recordList 형식)
+            else if (jsonData && jsonData.recordList) {
+                console.log('📊 JSON 데이터 발견! (recordList) 레코드 수:', jsonData.recordList.length);
+
+                jsonData.recordList.forEach(record => {
+                    const currCode = record.currSgn;  // API 형식
+                    const currName = record.curr;
+                    const baseRate = parseFloat(record.fxrt);
+
+                    if (currCode && !isNaN(baseRate)) {
+                        rates[currCode] = baseRate;
+                        currencyNames[currCode] = currName || currCode;
+                    }
+                });
+            }
+
+            console.log('🎯 파싱된 환율 수:', Object.keys(rates).length);
+
+            if (Object.keys(rates).length > 0) {
+                // 캐시에 저장
+                const key = `${CONFIG.CACHE_PREFIX}${date}`;
+                localStorage.setItem(key, JSON.stringify(rates));
+                localStorage.setItem(CONFIG.CURRENCY_NAMES_KEY, JSON.stringify(currencyNames));
+
+                allCurrencies = currencyNames;
+                updateWidget(date, rates);
+
+                showStatus('success', `웹 파싱으로 환율 데이터를 가져왔습니다 (${Object.keys(rates).length}개 통화)`);
+                updateSavedDatesList();
+
+                console.log('✅ 웹 파싱 성공!');
+                console.groupEnd();
+                return true;
+            }
+
+            console.groupEnd();
+            return false;
+        }
+
+        // 웹 파싱으로 환율 데이터 가져오기
+        function fetchRatesByParsing(date) {
+            console.group('🌐 웹 파싱 모드로 전환');
+            console.log('📅 요청 날짜:', date);
+
+            showStatus('loading', '웹 파싱으로 환율 데이터를 불러오는 중...');
+
+            // UNIPASS 웹 페이지 URL 구성
+            const pageIndex = 1;
+            const pageUnit = 100;
+            const weekFxrtTpcd = '2';  // 2: 수입
+            const timestamp = Date.now();
+
+            // 공식 웹페이지와 동일한 URL 형식
+            const unipassUrl = `https://unipass.customs.go.kr/csp/myc/bsopspptinfo/dclrSpptInfo/WeekFxrtQryCtr/retrieveWeekFxrt.do?pageIndex=${pageIndex}&pageUnit=${pageUnit}&aplyDt=${date}&weekFxrtTpcd=${weekFxrtTpcd}&undefined=${date}&_=${timestamp}`;
+
+            console.log('🔗 파싱 URL:', unipassUrl);
+
+            // CORS 프록시를 통해 웹 페이지 가져오기
+            const proxyUrls = [
+                `https://corsproxy.io/?url=${unipassUrl}`,  // corsproxy.io는 ?url= 형식 사용
+                `https://api.allorigins.win/get?url=${encodeURIComponent(unipassUrl)}`,
+                `https://cors-anywhere.herokuapp.com/${unipassUrl}`
+            ];
+
+            let attemptCount = 0;
+
+            function tryNextProxy() {
+                if (attemptCount >= proxyUrls.length) {
+                    console.error('❌ 모든 파싱 프록시 실패');
+                    showStatus('error', '웹 파싱도 실패했습니다. 네트워크 연결을 확인해주세요.');
+                    console.groupEnd();
+                    return;
+                }
+
+                const proxyUrl = proxyUrls[attemptCount];
+                console.log(`🔄 파싱 프록시 시도 ${attemptCount + 1}/${proxyUrls.length}:`, proxyUrl);
+
+                fetch(proxyUrl)
+                    .then(response => {
+                        console.log('📥 파싱 프록시 응답:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(text => {
+                        // allorigins.win은 JSON 형식으로 반환
+                        if (proxyUrl.includes('allorigins.win')) {
+                            try {
+                                const json = JSON.parse(text);
+                                text = json.contents;
+                            } catch (e) {
+                                console.log('allorigins 응답 파싱 실패');
+                            }
+                        }
+
+                        console.log('✅ 웹 페이지 가져오기 성공! 길이:', text.length);
+
+                        // JSON 응답인지 확인
+                        try {
+                            const jsonData = JSON.parse(text);
+
+                            // processJSONData 함수를 사용하여 처리
+                            if (processJSONData(jsonData, date)) {
+                                console.groupEnd();  // fetchRatesByParsing 그룹 종료
+                                return;  // 성공했으므로 종료
+                            }
+                        } catch (e) {
+                            console.log('JSON 파싱 실패:', e.message);
+                        }
+
+                        // 파싱 실패 시 다음 프록시 시도
+                        console.warn('⚠️ 데이터 파싱 실패, 다음 프록시 시도...');
+                        attemptCount++;
+                        tryNextProxy();
+                    })
+                    .catch(error => {
+                        console.error(`❌ 프록시 ${attemptCount + 1} 실패:`, error.message);
+                        attemptCount++;
+                        tryNextProxy();
+                    });
+            }
+
+            tryNextProxy();
+        }
+
+        // API에서 환율 불러오기 (파싱 우선, 실패 시 PHP 프록시 API)
+        function fetchRatesFromAPI(date) {
+            console.group('🔍 환율 데이터 가져오기 시작');
+            console.log('📅 요청 날짜:', date);
+
+            // 1순위: 웹 파싱 시도
+            showStatus('loading', '웹 페이지에서 환율 데이터를 가져오는 중...');
+
+            // 웹 파싱 먼저 시도
+            fetchRatesByParsingWithFallback(date);
+        }
+
+        // 웹 파싱 (실패 시 PHP 프록시 API로 폴백)
+        function fetchRatesByParsingWithFallback(date) {
+            console.log('1️⃣ 웹 파싱 우선 시도');
+
+            const pageIndex = 1;
+            const pageUnit = 100;
+            const weekFxrtTpcd = '2';  // 2: 수입
+            const timestamp = Date.now();
+
+            const unipassUrl = `https://unipass.customs.go.kr/csp/myc/bsopspptinfo/dclrSpptInfo/WeekFxrtQryCtr/retrieveWeekFxrt.do?pageIndex=${pageIndex}&pageUnit=${pageUnit}&aplyDt=${date}&weekFxrtTpcd=${weekFxrtTpcd}&undefined=${date}&_=${timestamp}`;
+
+            // 첫 번째 CORS 프록시로 빠르게 시도
+            const proxyUrl = `https://corsproxy.io/?url=${unipassUrl}`;
+
+            fetch(proxyUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    try {
+                        const jsonData = JSON.parse(text);
+
+                        if (processJSONData(jsonData, date)) {
+                            console.log('✅ 웹 파싱 성공!');
+                            console.groupEnd();
+                            return;
+                        }
+                        throw new Error('데이터 처리 실패');
+                    } catch (e) {
+                        throw new Error('JSON 파싱 실패: ' + e.message);
+                    }
+                })
+                .catch(error => {
+                    console.warn('⚠️ 웹 파싱 실패:', error.message);
+                    console.log('2️⃣ PHP 프록시 API로 폴백...');
+
+                    // 2순위: PHP 프록시 API 시도
+                    tryPhpProxyAPI(date);
+                });
+        }
+
+        // PHP 프록시 API 호출
+        function tryPhpProxyAPI(date) {
+            const dateStr = date.replace(/-/g, '');
+            const serviceKey = CONFIG.SERVICE_KEY;
+
+            showStatus('loading', 'API로 재시도 중...');
+
+            if (!serviceKey) {
+                console.warn('⚠️ 서비스 키 없음 - 다른 파싱 프록시 시도');
+                // 서비스 키가 없으면 다른 파싱 프록시들 시도
+                fetchRatesByParsing(date);
+                return;
+            }
+
+            const phpProxyUrl = `proxy.php?date=${dateStr}&weekFxrtTpcd=2&serviceKey=${encodeURIComponent(serviceKey)}`;
+
+            fetch(phpProxyUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`PHP 프록시 실패: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    // PHP 파싱 에러 방지를 위해 문자열 분리
+                    const xmlStart = '<' + '?xml';
+                    if (text.includes(xmlStart) || text.includes('<response>')) {
+                        console.log('✅ PHP 프록시 API 성공!');
+                        processXMLData(text, date);
+                        console.groupEnd();
+                    } else {
+                        throw new Error('유효하지 않은 XML');
+                    }
+                })
+                .catch(error => {
+                    console.warn('⚠️ PHP API도 실패:', error.message);
+                    console.log('3️⃣ 다른 파싱 프록시들 시도...');
+
+                    // 마지막: 다른 파싱 프록시들 시도
+                    fetchRatesByParsing(date);
+                });
+        }
+
+
+        // 저장된 날짜 토글
+        function toggleSavedDates() {
+            const list = document.getElementById('saved-dates-list');
+            list.classList.toggle('show');
+        }
+
+        // 저장된 날짜 목록 업데이트
+        function updateSavedDatesList() {
+            const container = document.getElementById('saved-dates-list');
+            const countSpan = document.getElementById('saved-count');
+            const dates = [];
+
+            // localStorage에서 모든 환율 데이터 가져오기
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith(CONFIG.CACHE_PREFIX)) {
+                    const date = key.replace(CONFIG.CACHE_PREFIX, '');
+                    dates.push(date);
+                }
+            }
+
+            // 개수 업데이트
+            countSpan.textContent = dates.length;
+
+            if (dates.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // 날짜 정렬 (최신순)
+            dates.sort().reverse();
+
+            let html = '<div class="saved-dates-title">저장된 환율 날짜</div>';
+            dates.forEach(date => {
+                html += `
+                    <div class="saved-date-item">
+                        <span onclick="loadSavedDate('${date}')">${date}</span>
+                        <button class="delete-date-btn" onclick="deleteSavedDate('${date}', event)">삭제</button>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 저장된 날짜 클릭 시 불러오기
+        function loadSavedDate(date) {
+            document.getElementById('date').value = date;
+            fetchRatesOnDateChange();
+        }
+
+        // 저장된 날짜 삭제
+        function deleteSavedDate(date, event) {
+            event.stopPropagation();
+
+            if (confirm(`${date} 환율 데이터를 삭제하시겠습니까?`)) {
+                const key = `${CONFIG.CACHE_PREFIX}${date}`;
+                localStorage.removeItem(key);
+                updateSavedDatesList();
+            }
+        }
+
+        // 통화 기호 가져오기
+        function getCurrencySymbol(currency) {
+            const symbols = {
+                'USD': '$',
+                'EUR': '€',
+                'CHF': 'Fr',
+                'KRW': '₩',
+                'JPY': '¥',
+                'GBP': '£',
+                'CNY': '¥',
+                'AUD': 'A$',
+                'CAD': 'C$',
+                'HKD': 'HK$',
+                'SGD': 'S$',
+                'NZD': 'NZ$',
+                'SEK': 'kr',
+                'NOK': 'kr',
+                'DKK': 'kr',
+                'RUB': '₽',
+                'INR': '₹',
+                'BRL': 'R$',
+                'ZAR': 'R',
+                'THB': '฿',
+                'MYR': 'RM',
+                'IDR': 'Rp',
+                'PHP': '₱',
+                'VND': '₫',
+                'MXN': 'Mex$',
+                'TRY': '₺',
+                'PLN': 'zł',
+                'AED': 'د.إ',
+                'SAR': 'SR'
+            };
+            return symbols[currency] || '';
+        }
+
+        // 통화 이름 가져오기
+        function getCurrencyName(currency) {
+            const detailedName = getDetailedCurrencyName(currency);
+
+            if (currency === 'KRW') {
+                return '원 (KRW)';
+            }
+
+            return `${detailedName} (${currency})`;
+        }
+
+        // 상세 통화 이름 가져오기 (국가명 포함)
+        function getDetailedCurrencyName(code) {
+            const detailedNames = {
+                'USD': '미국 달러',
+                'EUR': '유로',
+                'JPY': '일본 엔',
+                'GBP': '영국 파운드',
+                'CHF': '스위스 프랑',
+                'CNY': '중국 위안',
+                'AUD': '호주 달러',
+                'CAD': '캐나다 달러',
+                'HKD': '홍콩 달러',
+                'SGD': '싱가포르 달러',
+                'NZD': '뉴질랜드 달러',
+                'SEK': '스웨덴 크로나',
+                'NOK': '노르웨이 크로네',
+                'DKK': '덴마크 크로네',
+                'RUB': '러시아 루블',
+                'INR': '인도 루피',
+                'BRL': '브라질 헤알',
+                'ZAR': '남아프리카공화국 랜드',
+                'THB': '태국 바트',
+                'MYR': '말레이시아 링깃',
+                'IDR': '인도네시아 루피아',
+                'PHP': '필리핀 페소',
+                'VND': '베트남 동',
+                'MXN': '멕시코 페소',
+                'TRY': '튀르키예 리라',
+                'PLN': '폴란드 즐로티',
+                'AED': '아랍에미리트 디르함',
+                'SAR': '사우디아라비아 리얄',
+                'KWD': '쿠웨이트 디나르',
+                'BHD': '바레인 디나르',
+                'JOD': '요르단 디나르',
+                'QAR': '카타르 리얄',
+                'OMR': '오만 리알',
+                'EGP': '이집트 파운드',
+                'ILS': '이스라엘 셰켈',
+                'CLP': '칠레 페소',
+                'COP': '콜롬비아 페소',
+                'ARS': '아르헨티나 페소',
+                'CZK': '체코 코루나',
+                'HUF': '헝가리 포린트',
+                'RON': '루마니아 레우',
+                'ISK': '아이슬란드 크로나',
+                'HRK': '크로아티아 쿠나',
+                'BGN': '불가리아 레프',
+                'KZT': '카자흐스탄 텡게',
+                'PKR': '파키스탄 루피',
+                'BDT': '방글라데시 타카',
+                'LKR': '스리랑카 루피',
+                'TWD': '대만 달러',
+                'FJD': '피지 달러',
+                'PGK': '파푸아뉴기니 키나',
+                'MNT': '몽골 투그릭',
+                'BND': '브루나이 달러',
+                'KHR': '캄보디아 리엘',
+                'LAK': '라오스 킵',
+                'MMK': '미얀마 차트',
+                'NPR': '네팔 루피',
+                'ETB': '에티오피아 비르'
+            };
+
+            // 상세 이름이 있으면 사용, 없으면 API에서 받은 이름 사용
+            if (detailedNames[code]) {
+                return detailedNames[code];
+            }
+
+            // API에서 받은 이름 사용
+            if (allCurrencies[code] && allCurrencies[code] !== code) {
+                return allCurrencies[code];
+            }
+
+            return code;
+        }
+
+        // 계산 함수
+        function calculate() {
+            const date = document.getElementById('date').value;
+            const fromCurrency = document.getElementById('fromCurrency').value;
+            const amountStr = document.getElementById('amount').value.replace(/,/g, '');
+            const amount = parseFloat(amountStr);
+
+            // 유효성 검사
+            if (!date) {
+                alert('날짜를 선택해주세요.');
+                return;
+            }
+
+            if (!amount || amount <= 0) {
+                alert('올바른 금액을 입력해주세요.');
+                return;
+            }
+
+            if (!currentRates) {
+                alert('해당 날짜의 환율 데이터가 없습니다. 날짜를 선택하여 환율을 먼저 불러와주세요.');
+                return;
+            }
+
+            // 선택된 통화로 변환 계산
+            const currencies = ['KRW', ...selectedCurrencies];
+            const fromSymbol = getCurrencySymbol(fromCurrency);
+            let resultsHTML = '';
+
+            currencies.forEach(toCurrency => {
+                // 같은 통화는 건너뛰기
+                if (toCurrency === fromCurrency) return;
+
+                let result;
+                let appliedRate;
+
+                if (fromCurrency === 'KRW' && toCurrency !== 'KRW') {
+                    // 원화 → 외화
+                    appliedRate = currentRates[toCurrency];
+                    result = amount / appliedRate;
+
+                } else if (fromCurrency !== 'KRW' && toCurrency === 'KRW') {
+                    // 외화 → 원화
+                    appliedRate = currentRates[fromCurrency];
+                    result = amount * appliedRate;
+
+                } else if (fromCurrency !== 'KRW' && toCurrency !== 'KRW') {
+                    // 외화 → 외화
+                    const fromRate = currentRates[fromCurrency];
+                    const toRate = currentRates[toCurrency];
+
+                    const amountInKRW = amount * fromRate;
+                    result = amountInKRW / toRate;
+                    appliedRate = toRate;
+                }
+
+                // 결과 항목 생성
+                const toSymbol = getCurrencySymbol(toCurrency);
+                const rateDisplay = appliedRate ? appliedRate.toFixed(2) : '-';
+
+                resultsHTML += `
+                    <div class="result-item">
+                        <div class="result-currency">${getCurrencyName(toCurrency)}</div>
+                        <div class="result-amount">${toSymbol}${result.toLocaleString('ko-KR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <div class="result-rate">환율: ${rateDisplay} 원</div>
+                    </div>
+                `;
+            });
+
+            // 결과 표시
+            document.getElementById('resultList').innerHTML = resultsHTML;
+            document.getElementById('result').classList.add('show');
+        }
+
+        // Enter 키로 계산
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                calculate();
+            }
+        });
+
+        // 페이지 로드 시 저장된 날짜 목록 표시 및 환율 로드
+        updateSavedDatesList();
+        fetchRatesOnDateChange();
+    </script>
+</body>
+</html>

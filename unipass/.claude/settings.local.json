@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\Users\\CHAN2\\Music\\cord\\chan222k\\currency\\unipass\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

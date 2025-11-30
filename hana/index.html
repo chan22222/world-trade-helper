@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수출 환율 계산기</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💱</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #008485 0%, #00A896 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .calculator {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 18px;
+                margin-bottom: 15px;
+            }
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 30px;
+        }
+
+        @media (max-width: 968px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 계산기 섹션 */
+        .calculator-section {
+            padding: 0;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: flex-end;  /* 하단 정렬로 높이 맞춤 */
+        }
+
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 환율 위젯 */
+        .rate-widget {
+            background: linear-gradient(135deg, #008485 0%, #00A896 100%);
+            border-radius: 16px;
+            padding: 25px;
+            color: white;
+            position: sticky;
+            top: 20px;
+        }
+
+        .rate-widget-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rate-widget-date {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .rate-item {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .rate-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .rate-currency {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .rate-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .rate-label {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 3px;
+        }
+
+        .api-status {
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            text-align: center;
+            margin-top: 10px;
+            margin-bottom: 15px;  /* 아래 여백 추가 */
+            display: none;
+        }
+
+        .api-status.loading {
+            display: block;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .api-status.success {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .api-status.error {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .api-status.cached {
+            display: block;
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input[type="date"],
+        input[type="number"],
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="date"]:focus,
+        input[type="number"]:focus,
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #008485;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper input {
+            padding-right: 40px;
+        }
+
+        .clear-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #999;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 1;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .clear-btn:hover {
+            background: #666;
+        }
+
+        /* 계산기 섹션 */
+        .calculate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #008485 0%, #00A896 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 20px;
+        }
+
+        .calculate-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .calculate-btn:active {
+            transform: translateY(0);
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        .result-header {
+            color: #008485;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        #resultList {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        @media (max-width: 768px) {
+            #resultList {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .result-item {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 15px;
+            transition: all 0.3s;
+        }
+
+        .result-item:hover {
+            border-color: #008485;
+            box-shadow: 0 4px 12px rgba(0, 132, 133, 0.1);
+        }
+
+        .result-currency {
+            font-size: 13px;
+            color: #008485;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .result-amount {
+            font-size: 26px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .result-rate {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .info-message {
+            background: #e6f7f7;
+            border-left: 3px solid #008485;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #555;
+            line-height: 1.5;
+        }
+
+        .saved-dates {
+            margin-top: 15px;
+        }
+
+        .saved-dates-toggle {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .saved-dates-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .saved-dates-list {
+            display: none;
+            margin-top: 8px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .saved-dates-list.show {
+            display: block;
+        }
+
+        .saved-dates-title {
+            font-weight: 600;
+            color: white;
+            margin-bottom: 6px;
+            font-size: 11px;
+        }
+
+        .saved-date-item {
+            padding: 5px 8px;
+            margin-bottom: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 11px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .saved-date-item:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(3px);
+        }
+
+        .delete-date-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .delete-date-btn:hover {
+            background: #c82333;
+        }
+
+        /* 화폐 선택 버튼 (label 옆) */
+        .currency-select-btn {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 4px 10px;
+            background: #008485;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: normal;
+        }
+
+        .currency-select-btn:hover {
+            background: #00A896;
+        }
+
+        /* 모달 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .modal-close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .modal-close-btn:hover {
+            color: #333;
+        }
+
+        .currency-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .currency-checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .currency-checkbox-item:hover {
+            background: #e9ecef;
+        }
+
+        .currency-checkbox-item input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        .currency-checkbox-item label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: normal;
+            font-size: 13px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <h1>수출 환율 계산기 (하나은행)</h1>
+
+        <div class="main-content">
+            <!-- 왼쪽: 계산기 섹션 -->
+            <div class="calculator-section">
+                <div class="form-group">
+                    <label for="date">날짜</label>
+                    <input type="date" id="date" required onchange="fetchRatesOnDateChange()">
+                </div>
+
+                <div id="api-status" class="api-status"></div>
+
+                <div class="form-row">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="fromCurrency">
+                            통화 선택
+                            <button type="button" class="currency-select-btn" onclick="openCurrencyModal()">화폐 선택</button>
+                        </label>
+                        <select id="fromCurrency">
+                            <option value="KRW">원 (KRW)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="amount">금액</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="amount" placeholder="금액을 입력하세요" required>
+                            <button type="button" class="clear-btn" id="clearAmount">×</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="calculate-btn" onclick="calculate()">계산하기</button>
+
+                <div class="result" id="result">
+                    <div class="result-header">환전 결과</div>
+                    <div id="resultList"></div>
+                </div>
+
+                <div class="info-message" style="margin-top: 20px;">
+                    <strong>계산 방식:</strong><br>
+                    • <strong>원화 관련:</strong> 하나은행 송금 환율 사용<br>
+                    • <strong>외화 간:</strong> 대미환산율 기반 교차환율(Cross Rate) 사용<br>
+                    <br>
+                    예) EUR 1 = 1.1556 USD, CHF 1 = 1.2424 USD<br>
+                    → EUR 1 = (1.2424 / 1.1556) CHF = 1.0751 CHF
+                </div>
+            </div>
+
+            <!-- 오른쪽: 환율 정보 위젯 -->
+            <div class="rate-widget">
+                <div class="rate-widget-title">송금 환율 (하나은행)</div>
+                <div class="rate-widget-date" id="widget-date">날짜를 선택하세요</div>
+
+                <!-- 환율 항목들은 동적으로 생성됨 -->
+
+                <!-- 저장된 날짜 목록 -->
+                <div class="saved-dates">
+                    <button class="saved-dates-toggle" onclick="toggleSavedDates()">
+                        저장된 환율 날짜 보기 (<span id="saved-count">0</span>)
+                    </button>
+                    <div class="saved-dates-list" id="saved-dates-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 화폐 선택 모달 -->
+    <div class="modal-overlay" id="currencyModal" onclick="closeModalOnOverlay(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 class="modal-title">자주 쓰는 화폐 선택</h2>
+                <button class="modal-close-btn" onclick="closeCurrencyModal()">&times;</button>
+            </div>
+            <div id="currency-checkboxes" class="currency-checkboxes">
+                <!-- 동적으로 생성됨 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 현재 로드된 환율 데이터
+        let currentRates = null;
+        let allCurrencies = {}; // 모든 화폐 정보 저장
+        let selectedCurrencies = ['USD', 'EUR', 'CHF']; // 기본 선택된 화폐
+
+        // 초기화
+        const today = new Date();
+        const dateInput = document.getElementById('date');
+        dateInput.valueAsDate = today;
+        // 오늘 날짜까지만 선택 가능하도록 max 속성 설정
+        dateInput.max = today.toISOString().split('T')[0];
+
+        // localStorage에서 선호 화폐 불러오기
+        function loadSelectedCurrencies() {
+            const saved = localStorage.getItem('selectedCurrencies_hana');
+            if (saved) {
+                selectedCurrencies = JSON.parse(saved);
+            }
+
+            // 화폐 이름 정보 불러오기
+            const savedNames = localStorage.getItem('currencyNames_hana');
+            if (savedNames) {
+                allCurrencies = JSON.parse(savedNames);
+            }
+        }
+
+        // localStorage에 선호 화폐 저장
+        function saveSelectedCurrencies() {
+            localStorage.setItem('selectedCurrencies_hana', JSON.stringify(selectedCurrencies));
+        }
+
+        // 모달 열기
+        function openCurrencyModal() {
+            const modal = document.getElementById('currencyModal');
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden'; // 스크롤 방지
+        }
+
+        // 모달 닫기
+        function closeCurrencyModal() {
+            const modal = document.getElementById('currencyModal');
+            modal.classList.remove('show');
+            document.body.style.overflow = ''; // 스크롤 복원
+        }
+
+        // 오버레이 클릭 시 모달 닫기
+        function closeModalOnOverlay(event) {
+            if (event.target.id === 'currencyModal') {
+                closeCurrencyModal();
+            }
+        }
+
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeCurrencyModal();
+            }
+        });
+
+        // 체크박스 렌더링
+        function renderCurrencyCheckboxes() {
+            const container = document.getElementById('currency-checkboxes');
+
+            if (Object.keys(allCurrencies).length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">날짜를 선택하여 환율을 먼저 불러와주세요</p>';
+                return;
+            }
+
+            let html = '';
+            const sortedCurrencies = Object.keys(allCurrencies).sort();
+
+            sortedCurrencies.forEach(code => {
+                const detailedName = getDetailedCurrencyName(code);
+                const checked = selectedCurrencies.includes(code) ? 'checked' : '';
+                html += `
+                    <div class="currency-checkbox-item">
+                        <input type="checkbox" id="curr-${code}" value="${code}" ${checked} onchange="updateCurrencySelections()">
+                        <label for="curr-${code}">${detailedName} (${code})</label>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 체크박스 변경 시 처리
+        function updateCurrencySelections() {
+            const checkboxes = document.querySelectorAll('#currency-checkboxes input[type="checkbox"]');
+            selectedCurrencies = [];
+
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    selectedCurrencies.push(checkbox.value);
+                }
+            });
+
+            saveSelectedCurrencies();
+            updateCurrencyDropdown();
+            updateRateWidget();
+        }
+
+        // 통화 선택 드롭다운 업데이트
+        function updateCurrencyDropdown() {
+            const dropdown = document.getElementById('fromCurrency');
+            const currentValue = dropdown.value;
+
+            // KRW는 항상 포함
+            let html = '<option value="KRW">원 (KRW)</option>';
+
+            selectedCurrencies.forEach(code => {
+                const detailedName = getDetailedCurrencyName(code);
+                html += `<option value="${code}">${detailedName} (${code})</option>`;
+            });
+
+            dropdown.innerHTML = html;
+
+            // 이전 선택 값 유지 (가능한 경우)
+            if (currentValue === 'KRW' || selectedCurrencies.includes(currentValue)) {
+                dropdown.value = currentValue;
+            }
+        }
+
+        // 환율 위젯 업데이트 (선택된 화폐만 표시)
+        function updateRateWidget() {
+            const widgetContainer = document.querySelector('.rate-widget');
+            const date = document.getElementById('date').value;
+
+            // 기존 환율 항목 제거 (저장된 날짜 부분 제외)
+            const existingItems = widgetContainer.querySelectorAll('.rate-item');
+            existingItems.forEach(item => item.remove());
+
+            if (!currentRates || selectedCurrencies.length === 0) {
+                return;
+            }
+
+            // 날짜 표시 바로 다음에 환율 항목 추가
+            const dateElement = document.getElementById('widget-date');
+
+            selectedCurrencies.forEach(code => {
+                const rate = currentRates[code];
+                const usdRate = currentRates[`${code}_usd`];
+                const detailedName = getDetailedCurrencyName(code);
+                const symbol = getCurrencySymbol(code);
+
+                const rateItem = document.createElement('div');
+                rateItem.className = 'rate-item';
+                rateItem.innerHTML = `
+                    <div class="rate-currency">${symbol} ${detailedName} (${code})</div>
+                    <div class="rate-value">${rate ? rate.toFixed(2) : '-'}</div>
+                    <div class="rate-label">원 (송금 보낼 때)</div>
+                    <div class="rate-label" style="font-size: 10px; margin-top: 3px; opacity: 0.7;">대미환산율: ${usdRate ? usdRate.toFixed(4) : '-'}</div>
+                `;
+
+                // 저장된 날짜 섹션 전에 삽입
+                const savedDatesSection = widgetContainer.querySelector('.saved-dates');
+                widgetContainer.insertBefore(rateItem, savedDatesSection);
+            });
+        }
+
+        // 페이지 로드 시 초기화
+        loadSelectedCurrencies();
+
+        // X 버튼 클릭 시 금액 지우기
+        const clearBtn = document.getElementById('clearAmount');
+        document.getElementById('clearAmount').addEventListener('click', function() {
+            document.getElementById('amount').value = '';
+            clearBtn.style.display = 'none';
+            document.getElementById('amount').focus();
+        });
+
+        // 금액 입력 필드에 쉼표 추가
+        const amountInput = document.getElementById('amount');
+
+        // X 버튼 표시/숨김 처리
+        function updateClearButton() {
+            if (amountInput.value) {
+                clearBtn.style.display = 'flex';
+            } else {
+                clearBtn.style.display = 'none';
+            }
+        }
+
+        amountInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/,/g, '');
+            updateClearButton();
+
+            // 숫자, 소수점만 허용
+            if (value && !/^[\d.]*$/.test(value)) {
+                value = value.replace(/[^\d.]/g, '');
+            }
+
+            // 소수점이 있는지 확인
+            if (value.includes('.')) {
+                const parts = value.split('.');
+                const integerPart = parts[0];
+                const decimalPart = parts[1] || '';
+
+                // 정수 부분에만 쉼표 추가
+                if (integerPart) {
+                    const formatted = parseInt(integerPart).toLocaleString('en-US');
+                    e.target.value = formatted + '.' + decimalPart;
+                } else {
+                    e.target.value = '.' + decimalPart;
+                }
+            } else if (value && !isNaN(value)) {
+                e.target.value = parseInt(value).toLocaleString('en-US');
+            } else {
+                e.target.value = value;
+            }
+        });
+
+        amountInput.addEventListener('blur', function(e) {
+            let value = e.target.value.replace(/,/g, '');
+            if (value && !isNaN(value) && value !== '.') {
+                e.target.value = parseFloat(value).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
+            updateClearButton();
+        });
+
+        amountInput.addEventListener('focus', function(e) {
+            updateClearButton();
+        });
+
+        // 위젯 업데이트
+        function updateWidget(date, rates) {
+            document.getElementById('widget-date').textContent = date;
+
+            // 계산에 사용할 현재 환율 저장
+            currentRates = rates;
+
+            // 체크박스와 위젯 업데이트
+            renderCurrencyCheckboxes();
+            updateCurrencyDropdown();
+            updateRateWidget();
+        }
+
+        // 날짜 변경 시 환율 자동 불러오기 (캐시 확인 후 API 호출)
+        function fetchRatesOnDateChange() {
+            const dateInput = document.getElementById('date');
+            const date = dateInput.value;
+
+            if (!date) {
+                return;
+            }
+
+            // 미래 날짜 검증
+            const selectedDate = new Date(date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // 시간 제거하여 날짜만 비교
+            selectedDate.setHours(0, 0, 0, 0);
+
+            if (selectedDate > today) {
+                showStatus('error', '미래의 환율을 알 수는 없습니다.');
+                // 오늘 날짜로 리셋
+                dateInput.valueAsDate = today;
+                return;
+            }
+
+            const key = `exchangeRate_hana_${date}`;
+            const cachedRates = localStorage.getItem(key);
+
+            // 캐시에 데이터가 있으면 캐시 사용
+            if (cachedRates) {
+                const rates = JSON.parse(cachedRates);
+                updateWidget(date, rates);
+                showStatus('cached', `캐시에서 불러왔습니다 (${date})`);
+                return;
+            }
+
+            // 캐시에 없으면 API 호출
+            fetchRatesFromAPI(date);
+        }
+
+        // API 상태 표시
+        function showStatus(type, message) {
+            const statusEl = document.getElementById('api-status');
+            statusEl.className = `api-status ${type}`;
+            statusEl.textContent = message;
+
+            // 성공/캐시 메시지는 3초 후 숨김
+            if (type === 'success' || type === 'cached') {
+                setTimeout(() => {
+                    statusEl.className = 'api-status';
+                }, 3000);
+            }
+        }
+
+        // 통화 코드 추출 (괄호 안에 있는 코드 또는 키워드로 매칭)
+        function extractCurrencyCode(currencyText) {
+            const codeMatch = currencyText.match(/\(([A-Z]{3})\)/);
+            if (codeMatch) return codeMatch[1];
+
+            // 키워드 매칭
+            const mapping = {
+                '미국': 'USD', '일본': 'JPY', '유로': 'EUR', '영국': 'GBP', '스위스': 'CHF',
+                '중국': 'CNY', '호주': 'AUD', '캐나다': 'CAD', '홍콩': 'HKD', '싱가포르': 'SGD',
+                '뉴질랜드': 'NZD', '스웨덴': 'SEK', '노르웨이': 'NOK', '덴마크': 'DKK',
+                '러시아': 'RUB', '인도': 'INR', '브라질': 'BRL', '남아공': 'ZAR', '태국': 'THB',
+                '말레이시아': 'MYR', '인도네시아': 'IDR', '필리핀': 'PHP', '베트남': 'VND',
+                '멕시코': 'MXN', '터키': 'TRY', '폴란드': 'PLN', 'UAE': 'AED', '사우디': 'SAR',
+                '쿠웨이트': 'KWD', '바레인': 'BHD', '요르단': 'JOD', '카타르': 'QAR', '오만': 'OMR',
+                '이집트': 'EGP', '이스라엘': 'ILS', '칠레': 'CLP', '콜롬비아': 'COP',
+                '아르헨티나': 'ARS', '체코': 'CZK', '헝가리': 'HUF', '루마니아': 'RON',
+                '대만': 'TWD', '몽골': 'MNT', '파키스탄': 'PKR', '방글라데시': 'BDT'
+            };
+
+            for (const [keyword, code] of Object.entries(mapping)) {
+                if (currencyText.includes(keyword)) return code;
+            }
+
+            return null;
+        }
+
+        // HTML에서 환율 데이터 추출 헬퍼 함수 (모든 화폐)
+        function extractRatesFromHtml(html, extractType) {
+            console.log(`[extractRatesFromHtml] extractType: ${extractType}, HTML length: ${html.length}`);
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const tables = doc.querySelectorAll('table');
+
+            console.log(`[extractRatesFromHtml] 테이블 개수: ${tables.length}`);
+
+            const data = {};
+            const currencyNames = {};
+
+            tables.forEach((table, tableIndex) => {
+                const rows = table.querySelectorAll('tbody tr');
+                console.log(`[extractRatesFromHtml] 테이블 ${tableIndex}: ${rows.length}개 행`);
+
+                rows.forEach((row, rowIndex) => {
+                    const cells = row.querySelectorAll('td');
+
+                    // 첫 번째 행의 셀 개수 확인
+                    if (rowIndex === 0) {
+                        console.log(`[extractRatesFromHtml] 테이블 ${tableIndex} 첫 행 셀 개수: ${cells.length}`);
+                        if (cells.length > 0) {
+                            const cellTexts = Array.from(cells).map(c => c.textContent.trim().substring(0, 20));
+                            console.log(`[extractRatesFromHtml] 첫 행 셀 내용:`, cellTexts);
+                        }
+                    }
+
+                    let cellIndex;
+                    let minCells;
+
+                    if (extractType === 'rate') {
+                        // 송금환율 추출 (mall1501)
+                        if (cells.length >= 11) {
+                            cellIndex = 5;  // 송금 보낼 때
+                            minCells = 11;
+                        } else {
+                            cellIndex = 3;  // 이전 형식 (9개 컬럼)
+                            minCells = 9;
+                        }
+                    } else {
+                        // 대미환산율 추출 (mall1502)
+                        if (cells.length >= 9) {
+                            cellIndex = 8;
+                            minCells = 9;
+                        } else if (cells.length >= 2) {
+                            cellIndex = 1;
+                            minCells = 2;
+                        } else {
+                            return;
+                        }
+                    }
+
+                    if (cells.length >= minCells) {
+                        const currencyText = cells[0].textContent.trim();
+                        const currencyCode = extractCurrencyCode(currencyText);
+
+                        if (currencyCode) {
+                            const valueText = cells[cellIndex].textContent.trim();
+                            const value = parseFloat(valueText.replace(/,/g, ''));
+
+                            if (!isNaN(value) && value > 0) {
+                                data[currencyCode] = value;
+                                currencyNames[currencyCode] = currencyText;
+                            }
+                        }
+                    }
+                });
+            });
+
+            return { data, currencyNames };
+        }
+
+        // 하나은행 HTML 파싱 함수 (두 페이지 데이터 결합)
+        function parseHanaBank(mall1501Html, mall1502Html, date) {
+            console.log('송금 환율 추출 시작 (mall1501)...');
+            const sendingResult = extractRatesFromHtml(mall1501Html, 'rate');
+            console.log('추출된 송금 보낼 때 환율:', sendingResult.data);
+
+            console.log('대미환산율 추출 시작 (mall1502)...');
+            const usdResult = extractRatesFromHtml(mall1502Html, 'usd');
+            console.log('추출된 대미환산율:', usdResult.data);
+
+            // 데이터 확인
+            if (!sendingResult.data.USD) {
+                console.error('송금 환율 추출 실패:', sendingResult.data);
+                throw new Error('송금 환율 데이터를 찾을 수 없습니다');
+            }
+
+            if (!usdResult.data.USD) {
+                console.error('대미환산율 추출 실패:', usdResult.data);
+                throw new Error('대미환산율 데이터를 찾을 수 없습니다');
+            }
+
+            // 두 데이터를 결합 (모든 화폐)
+            const rates = {};
+            const combinedCurrencyNames = { ...sendingResult.currencyNames, ...usdResult.currencyNames };
+
+            // 송금 환율 추가
+            for (const [code, rate] of Object.entries(sendingResult.data)) {
+                rates[code] = rate;
+            }
+
+            // 대미환산율 추가 (_usd 접미사 사용)
+            for (const [code, rate] of Object.entries(usdResult.data)) {
+                rates[`${code}_usd`] = rate;
+            }
+
+            // 화폐 이름 정보를 전역 변수와 localStorage에 저장
+            allCurrencies = combinedCurrencyNames;
+            const currNamesKey = `currencyNames_hana`;
+            localStorage.setItem(currNamesKey, JSON.stringify(combinedCurrencyNames));
+
+            // localStorage에 캐시 저장
+            const key = `exchangeRate_hana_${date}`;
+            localStorage.setItem(key, JSON.stringify(rates));
+
+            // 위젯 업데이트
+            updateWidget(date, rates);
+
+            showStatus('success', '하나은행 환율 데이터를 불러왔습니다');
+            updateSavedDatesList();
+            return rates;
+        }
+
+        // 하나은행에서 환율 불러오기 (mall1501과 mall1502에서 데이터 결합)
+        function fetchRatesFromAPI(date) {
+            showStatus('loading', '하나은행에서 환율 데이터를 불러오는 중...');
+
+            // mall1501(송금 환율)과 mall1502(대미환산율)를 동시에 호출
+            const mall1501Promise = fetch(`proxy.php?date=${date}&page=mall1501`);
+            const mall1502Promise = fetch(`proxy.php?date=${date}&page=mall1502`);
+
+            Promise.all([mall1501Promise, mall1502Promise])
+                .then(responses => {
+                    if (!responses[0].ok || !responses[1].ok) {
+                        throw new Error('프록시 응답 오류');
+                    }
+                    return Promise.all([responses[0].text(), responses[1].text()]);
+                })
+                .then(([mall1501Html, mall1502Html]) => {
+                    console.log('하나은행 데이터 로드 성공');
+                    console.log('송금 환율(mall1501) HTML 길이:', mall1501Html.length);
+                    console.log('대미환산율(mall1502) HTML 길이:', mall1502Html.length);
+                    parseHanaBank(mall1501Html, mall1502Html, date);
+                })
+                .catch(error => {
+                    console.error('하나은행 환율 로드 실패:', error);
+                    showStatus('error', '환율 데이터를 불러오는데 실패했습니다: ' + error.message);
+                });
+        }
+
+
+        // 저장된 날짜 토글
+        function toggleSavedDates() {
+            const list = document.getElementById('saved-dates-list');
+            list.classList.toggle('show');
+        }
+
+        // 저장된 날짜 목록 업데이트
+        function updateSavedDatesList() {
+            const container = document.getElementById('saved-dates-list');
+            const countSpan = document.getElementById('saved-count');
+            const dates = [];
+
+            // localStorage에서 모든 환율 데이터 가져오기
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('exchangeRate_hana_')) {
+                    const date = key.replace('exchangeRate_hana_', '');
+                    dates.push(date);
+                }
+            }
+
+            // 개수 업데이트
+            countSpan.textContent = dates.length;
+
+            if (dates.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // 날짜 정렬 (최신순)
+            dates.sort().reverse();
+
+            let html = '<div class="saved-dates-title">저장된 환율 날짜</div>';
+            dates.forEach(date => {
+                html += `
+                    <div class="saved-date-item">
+                        <span onclick="loadSavedDate('${date}')">${date}</span>
+                        <button class="delete-date-btn" onclick="deleteSavedDate('${date}', event)">삭제</button>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 저장된 날짜 클릭 시 불러오기
+        function loadSavedDate(date) {
+            document.getElementById('date').value = date;
+            fetchRatesOnDateChange();
+        }
+
+        // 저장된 날짜 삭제
+        function deleteSavedDate(date, event) {
+            event.stopPropagation();
+
+            if (confirm(`${date} 환율 데이터를 삭제하시겠습니까?`)) {
+                const key = `exchangeRate_hana_${date}`;
+                localStorage.removeItem(key);
+                updateSavedDatesList();
+            }
+        }
+
+        // 통화 기호 가져오기
+        function getCurrencySymbol(currency) {
+            const symbols = {
+                'USD': '$',
+                'EUR': '€',
+                'CHF': 'Fr',
+                'KRW': '₩',
+                'JPY': '¥',
+                'GBP': '£',
+                'CNY': '¥',
+                'AUD': 'A$',
+                'CAD': 'C$',
+                'HKD': 'HK$',
+                'SGD': 'S$',
+                'NZD': 'NZ$',
+                'SEK': 'kr',
+                'NOK': 'kr',
+                'DKK': 'kr',
+                'RUB': '₽',
+                'INR': '₹',
+                'BRL': 'R$',
+                'ZAR': 'R',
+                'THB': '฿',
+                'MYR': 'RM',
+                'IDR': 'Rp',
+                'PHP': '₱',
+                'VND': '₫',
+                'MXN': 'Mex$',
+                'TRY': '₺',
+                'PLN': 'zł',
+                'AED': 'د.إ',
+                'SAR': 'SR'
+            };
+            return symbols[currency] || '';
+        }
+
+        // 통화 이름 가져오기
+        function getCurrencyName(currency) {
+            const detailedName = getDetailedCurrencyName(currency);
+
+            if (currency === 'KRW') {
+                return '원 (KRW)';
+            }
+
+            return `${detailedName} (${currency})`;
+        }
+
+        // 상세 통화 이름 가져오기 (국가명 포함)
+        function getDetailedCurrencyName(code) {
+            const detailedNames = {
+                'USD': '미국 달러',
+                'EUR': '유로',
+                'JPY': '일본 엔',
+                'GBP': '영국 파운드',
+                'CHF': '스위스 프랑',
+                'CNY': '중국 위안',
+                'AUD': '호주 달러',
+                'CAD': '캐나다 달러',
+                'HKD': '홍콩 달러',
+                'SGD': '싱가포르 달러',
+                'NZD': '뉴질랜드 달러',
+                'SEK': '스웨덴 크로나',
+                'NOK': '노르웨이 크로네',
+                'DKK': '덴마크 크로네',
+                'RUB': '러시아 루블',
+                'INR': '인도 루피',
+                'BRL': '브라질 헤알',
+                'ZAR': '남아프리카공화국 랜드',
+                'THB': '태국 바트',
+                'MYR': '말레이시아 링깃',
+                'IDR': '인도네시아 루피아',
+                'PHP': '필리핀 페소',
+                'VND': '베트남 동',
+                'MXN': '멕시코 페소',
+                'TRY': '튀르키예 리라',
+                'PLN': '폴란드 즐로티',
+                'AED': '아랍에미리트 디르함',
+                'SAR': '사우디아라비아 리얄',
+                'KWD': '쿠웨이트 디나르',
+                'BHD': '바레인 디나르',
+                'JOD': '요르단 디나르',
+                'QAR': '카타르 리얄',
+                'OMR': '오만 리알',
+                'EGP': '이집트 파운드',
+                'ILS': '이스라엘 셰켈',
+                'CLP': '칠레 페소',
+                'COP': '콜롬비아 페소',
+                'ARS': '아르헨티나 페소',
+                'CZK': '체코 코루나',
+                'HUF': '헝가리 포린트',
+                'RON': '루마니아 레우',
+                'ISK': '아이슬란드 크로나',
+                'HRK': '크로아티아 쿠나',
+                'BGN': '불가리아 레프',
+                'KZT': '카자흐스탄 텡게',
+                'PKR': '파키스탄 루피',
+                'BDT': '방글라데시 타카',
+                'LKR': '스리랑카 루피',
+                'TWD': '대만 달러',
+                'FJD': '피지 달러',
+                'PGK': '파푸아뉴기니 키나',
+                'MNT': '몽골 투그릭',
+                'BND': '브루나이 달러',
+                'KHR': '캄보디아 리엘',
+                'LAK': '라오스 킵',
+                'MMK': '미얀마 차트',
+                'NPR': '네팔 루피',
+                'ETB': '에티오피아 비르'
+            };
+
+            // 상세 이름이 있으면 사용, 없으면 API에서 받은 이름 사용
+            if (detailedNames[code]) {
+                return detailedNames[code];
+            }
+
+            // API에서 받은 이름 사용
+            if (allCurrencies[code] && allCurrencies[code] !== code) {
+                return allCurrencies[code];
+            }
+
+            return code;
+        }
+
+        // 계산 함수
+        function calculate() {
+            const date = document.getElementById('date').value;
+            const fromCurrency = document.getElementById('fromCurrency').value;
+            const amountStr = document.getElementById('amount').value.replace(/,/g, '');
+            const amount = parseFloat(amountStr);
+
+            // 유효성 검사
+            if (!date) {
+                alert('날짜를 선택해주세요.');
+                return;
+            }
+
+            if (!amount || amount <= 0) {
+                alert('올바른 금액을 입력해주세요.');
+                return;
+            }
+
+            if (!currentRates) {
+                alert('해당 날짜의 환율 데이터가 없습니다. 날짜를 선택하여 환율을 먼저 불러와주세요.');
+                return;
+            }
+
+            // 선택된 통화로 변환 계산
+            const currencies = ['KRW', ...selectedCurrencies];
+            const fromSymbol = getCurrencySymbol(fromCurrency);
+            let resultsHTML = '';
+
+            currencies.forEach(toCurrency => {
+                // 같은 통화는 건너뛰기
+                if (toCurrency === fromCurrency) return;
+
+                let result;
+                let appliedRate;
+                let rateInfo = '';
+
+                // 원화가 포함된 경우: 하나은행 환율 사용
+                if (fromCurrency === 'KRW' || toCurrency === 'KRW') {
+                    if (fromCurrency === 'KRW' && toCurrency !== 'KRW') {
+                        // 원화 → 외화
+                        appliedRate = currentRates[toCurrency];
+                        result = amount / appliedRate;
+                        rateInfo = `송금 환율: ${appliedRate.toLocaleString('ko-KR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} 원`;
+
+                    } else if (fromCurrency !== 'KRW' && toCurrency === 'KRW') {
+                        // 외화 → 원화
+                        appliedRate = currentRates[fromCurrency];
+                        result = amount * appliedRate;
+                        rateInfo = `송금 환율: ${appliedRate.toLocaleString('ko-KR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} 원`;
+                    }
+                } else {
+                    // 외화 → 외화: 대미환산율(교차환율) 사용
+                    // 대미환산율 의미: 1 외화 = X USD
+                    if (fromCurrency === 'USD') {
+                        // USD → 외화
+                        const toUsdRate = currentRates[`${toCurrency}_usd`];
+                        result = amount / toUsdRate; // 1 EUR = 1.1556 USD이면, 1 USD = 1/1.1556 EUR
+                        rateInfo = `교차환율: 1 USD = ${(1/toUsdRate).toFixed(4)} ${toCurrency}`;
+                    } else if (toCurrency === 'USD') {
+                        // 외화 → USD
+                        const fromUsdRate = currentRates[`${fromCurrency}_usd`];
+                        result = amount * fromUsdRate; // 1 EUR = 1.1556 USD
+                        rateInfo = `교차환율: 1 ${fromCurrency} = ${fromUsdRate.toFixed(4)} USD`;
+                    } else {
+                        // 외화 → USD → 외화
+                        const fromUsdRate = currentRates[`${fromCurrency}_usd`];
+                        const toUsdRate = currentRates[`${toCurrency}_usd`];
+                        const crossRate = fromUsdRate / toUsdRate; // 1 EUR = 1.1556 USD, 1 CHF = 1.0751 USD -> 1 EUR = 1.1556/1.0751 CHF
+                        result = amount * crossRate;
+                        rateInfo = `교차환율: 1 ${fromCurrency} = ${crossRate.toFixed(4)} ${toCurrency}`;
+                    }
+                }
+
+                // 결과 항목 생성
+                const toSymbol = getCurrencySymbol(toCurrency);
+
+                resultsHTML += `
+                    <div class="result-item">
+                        <div class="result-currency">${getCurrencyName(toCurrency)}</div>
+                        <div class="result-amount">${toSymbol}${result.toLocaleString('ko-KR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <div class="result-rate">${rateInfo}</div>
+                    </div>
+                `;
+            });
+
+            // 결과 표시
+            document.getElementById('resultList').innerHTML = resultsHTML;
+            document.getElementById('result').classList.add('show');
+        }
+
+        // Enter 키로 계산
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                calculate();
+            }
+        });
+
+        // 백슬래시(\) 키로 계산기 토글
+        document.addEventListener('keydown', function(e) {
+            if (e.key === '\\') {
+                e.preventDefault();
+                window.parent.postMessage('toggleCalculator', '*');
+            }
+        });
+
+        // 페이지 로드 시 저장된 날짜 목록 표시 및 환율 로드
+        updateSavedDatesList();
+        fetchRatesOnDateChange();
+    </script>
+</body>
+</html>

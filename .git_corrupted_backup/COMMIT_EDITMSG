@@ -1,0 +1,11 @@
+Add UNIPASS exchange rate calculator with secure config management
+
+- Add environment variable based config for API key security
+- Add detailed error debugging and logging
+- Add config.example.js template for easy setup
+- Add comprehensive README with installation guide
+- Update .gitignore to exclude sensitive config.js
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>

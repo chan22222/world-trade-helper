@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNIPASS 환율 API 테스트</title>
+    <script src="config.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #1e88e5;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #1e88e5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .log-container {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .log-success { color: green; }
+        .log-error { color: red; }
+        .log-warning { color: orange; }
+        .log-info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>UNIPASS 환율 API 테스트 페이지</h1>
+
+    <div class="test-section">
+        <h2>1. PHP 프록시 API 테스트</h2>
+        <p>PHP 프록시를 통해 관세청 API를 직접 호출합니다.</p>
+        <button onclick="testPhpProxy()">PHP 프록시 테스트</button>
+        <div id="php-status" class="status" style="display:none;"></div>
+        <pre id="php-result" style="display:none;"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 웹 파싱 테스트</h2>
+        <p>UNIPASS 웹페이지에서 환율 데이터를 파싱합니다.</p>
+        <button onclick="testWebParsing()">웹 파싱 테스트</button>
+        <div id="parsing-status" class="status" style="display:none;"></div>
+        <pre id="parsing-result" style="display:none;"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 자동 폴백 테스트</h2>
+        <p>PHP 프록시 시도 후 실패 시 자동으로 웹 파싱으로 전환합니다.</p>
+        <button onclick="testAutoFallback()">자동 폴백 테스트</button>
+        <div id="fallback-status" class="status" style="display:none;"></div>
+        <pre id="fallback-result" style="display:none;"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>실시간 로그</h2>
+        <button onclick="clearLogs()">로그 지우기</button>
+        <div id="log-container" class="log-container"></div>
+    </div>
+
+    <script>
+        // 로그 함수
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('log-container');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('log-container').innerHTML = '';
+        }
+
+        function showStatus(elementId, type, message) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `status ${type}`;
+            element.textContent = message;
+        }
+
+        // 1. PHP 프록시 테스트
+        function testPhpProxy() {
+            const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
+            const serviceKey = CONFIG.SERVICE_KEY;
+
+            if (!serviceKey) {
+                showStatus('php-status', 'error', '서비스 키가 설정되지 않았습니다. config.js를 확인해주세요.');
+                addLog('서비스 키 누락', 'error');
+                return;
+            }
+
+            showStatus('php-status', 'loading', 'PHP 프록시로 API 호출 중...');
+            addLog('PHP 프록시 테스트 시작', 'info');
+
+            const phpUrl = `proxy.php?date=${date}&weekFxrtTpcd=2&serviceKey=${encodeURIComponent(serviceKey)}`;
+
+            fetch(phpUrl)
+                .then(response => {
+                    addLog(`PHP 응답 상태: ${response.status}`, response.ok ? 'success' : 'warning');
+                    return response.text();
+                })
+                .then(text => {
+                    const resultEl = document.getElementById('php-result');
+                    resultEl.style.display = 'block';
+
+                    if (text.includes('<?xml') || text.includes('<response>')) {
+                        showStatus('php-status', 'success', 'PHP 프록시 성공!');
+                        addLog('XML 응답 수신 성공', 'success');
+
+                        // XML 파싱
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(text, 'text/xml');
+                        const items = xmlDoc.querySelectorAll('item');
+
+                        addLog(`환율 데이터 개수: ${items.length}개`, 'info');
+
+                        // 처음 5개만 표시
+                        let displayText = `응답 성공! 환율 데이터 ${items.length}개 발견\n\n`;
+                        for (let i = 0; i < Math.min(5, items.length); i++) {
+                            const item = items[i];
+                            const curr = item.querySelector('currSgn')?.textContent;
+                            const rate = item.querySelector('fxrt')?.textContent;
+                            displayText += `${curr}: ${rate}원\n`;
+                        }
+                        if (items.length > 5) {
+                            displayText += `... 외 ${items.length - 5}개\n`;
+                        }
+
+                        resultEl.textContent = displayText;
+                    } else {
+                        showStatus('php-status', 'error', 'PHP 프록시 실패 - 유효하지 않은 응답');
+                        addLog('유효하지 않은 XML 응답', 'error');
+                        resultEl.textContent = text.substring(0, 500);
+                    }
+                })
+                .catch(error => {
+                    showStatus('php-status', 'error', `PHP 프록시 실패: ${error.message}`);
+                    addLog(`PHP 프록시 에러: ${error.message}`, 'error');
+                    document.getElementById('php-result').style.display = 'none';
+                });
+        }
+
+        // 2. 웹 파싱 테스트
+        function testWebParsing() {
+            const date = new Date().toISOString().split('T')[0];
+
+            showStatus('parsing-status', 'loading', '웹 파싱 중...');
+            addLog('웹 파싱 테스트 시작', 'info');
+
+            const unipassUrl = `https://unipass.customs.go.kr/csp/myc/bsopspptinfo/dclrSpptInfo/WeekFxrtQryCtr/retrieveWeekFxrt.do?pageIndex=1&pageUnit=100&aplyDt=${date}&weekFxrtTpcd=2&undefined=${date}&_=${Date.now()}`;
+
+            addLog(`파싱 URL: ${unipassUrl}`, 'info');
+
+            // CORS 프록시 사용
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(unipassUrl)}`;
+
+            fetch(proxyUrl)
+                .then(response => {
+                    addLog(`프록시 응답 상태: ${response.status}`, response.ok ? 'success' : 'warning');
+                    return response.text();
+                })
+                .then(text => {
+                    const resultEl = document.getElementById('parsing-result');
+                    resultEl.style.display = 'block';
+
+                    try {
+                        // JSON 파싱 시도
+                        const jsonData = JSON.parse(text);
+                        if (jsonData.recordList) {
+                            showStatus('parsing-status', 'success', `웹 파싱 성공! ${jsonData.recordList.length}개 환율 발견`);
+                            addLog(`JSON 데이터 파싱 성공: ${jsonData.recordList.length}개`, 'success');
+
+                            let displayText = `JSON 응답 성공!\n총 레코드: ${jsonData.recordList.length}개\n\n`;
+                            for (let i = 0; i < Math.min(5, jsonData.recordList.length); i++) {
+                                const record = jsonData.recordList[i];
+                                displayText += `${record.currSgn}: ${record.fxrt}원 (${record.curr})\n`;
+                            }
+                            if (jsonData.recordList.length > 5) {
+                                displayText += `... 외 ${jsonData.recordList.length - 5}개`;
+                            }
+
+                            resultEl.textContent = displayText;
+                        } else {
+                            throw new Error('JSON 구조 불일치');
+                        }
+                    } catch (e) {
+                        // HTML 파싱 시도
+                        addLog('JSON 파싱 실패, HTML 파싱 시도', 'warning');
+
+                        if (text.includes('<table') || text.includes('<tr')) {
+                            showStatus('parsing-status', 'success', 'HTML 테이블 발견');
+                            resultEl.textContent = 'HTML 응답 (테이블 데이터 포함)\n\n' + text.substring(0, 1000) + '...';
+                        } else {
+                            showStatus('parsing-status', 'error', '파싱 가능한 데이터를 찾을 수 없음');
+                            resultEl.textContent = '응답:\n' + text.substring(0, 500);
+                        }
+                    }
+                })
+                .catch(error => {
+                    showStatus('parsing-status', 'error', `웹 파싱 실패: ${error.message}`);
+                    addLog(`웹 파싱 에러: ${error.message}`, 'error');
+                    document.getElementById('parsing-result').style.display = 'none';
+                });
+        }
+
+        // 3. 자동 폴백 테스트
+        function testAutoFallback() {
+            const date = new Date().toISOString().split('T')[0];
+            const dateStr = date.replace(/-/g, '');
+            const serviceKey = CONFIG.SERVICE_KEY;
+
+            showStatus('fallback-status', 'loading', '자동 폴백 테스트 중...');
+            addLog('자동 폴백 테스트 시작', 'info');
+
+            // 먼저 PHP 프록시 시도
+            const phpUrl = serviceKey
+                ? `proxy.php?date=${dateStr}&weekFxrtTpcd=2&serviceKey=${encodeURIComponent(serviceKey)}`
+                : `proxy.php?date=${dateStr}&weekFxrtTpcd=2&serviceKey=INVALID_KEY`;  // 일부러 실패하도록
+
+            addLog('1단계: PHP 프록시 시도', 'info');
+
+            fetch(phpUrl)
+                .then(response => {
+                    addLog(`PHP 응답: ${response.status}`, response.ok ? 'info' : 'warning');
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.text();
+                })
+                .then(text => {
+                    if (text.includes('<?xml') || text.includes('<response>')) {
+                        showStatus('fallback-status', 'success', 'PHP 프록시로 성공!');
+                        addLog('PHP 프록시 성공 - 폴백 불필요', 'success');
+
+                        document.getElementById('fallback-result').style.display = 'block';
+                        document.getElementById('fallback-result').textContent = 'PHP 프록시로 데이터 획득 성공\n\n' + text.substring(0, 500);
+                    } else {
+                        throw new Error('Invalid XML');
+                    }
+                })
+                .catch(phpError => {
+                    addLog(`PHP 실패: ${phpError.message} - 웹 파싱으로 전환`, 'warning');
+                    addLog('2단계: 웹 파싱 폴백 시작', 'info');
+
+                    showStatus('fallback-status', 'loading', '웹 파싱으로 자동 전환 중...');
+
+                    // 웹 파싱으로 폴백
+                    const unipassUrl = `https://unipass.customs.go.kr/csp/myc/bsopspptinfo/dclrSpptInfo/WeekFxrtQryCtr/retrieveWeekFxrt.do?pageIndex=1&pageUnit=100&aplyDt=${date}&weekFxrtTpcd=2&undefined=${date}&_=${Date.now()}`;
+                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(unipassUrl)}`;
+
+                    return fetch(proxyUrl)
+                        .then(response => {
+                            addLog(`파싱 프록시 응답: ${response.status}`, response.ok ? 'info' : 'warning');
+                            return response.text();
+                        })
+                        .then(text => {
+                            try {
+                                const jsonData = JSON.parse(text);
+                                if (jsonData.recordList) {
+                                    showStatus('fallback-status', 'success', `폴백 성공! 웹 파싱으로 ${jsonData.recordList.length}개 환율 획득`);
+                                    addLog(`웹 파싱 폴백 성공: ${jsonData.recordList.length}개 데이터`, 'success');
+
+                                    document.getElementById('fallback-result').style.display = 'block';
+                                    document.getElementById('fallback-result').textContent =
+                                        `자동 폴백 성공!\n\n` +
+                                        `1. PHP 프록시: 실패 (${phpError.message})\n` +
+                                        `2. 웹 파싱: 성공 (${jsonData.recordList.length}개 환율)\n\n` +
+                                        `샘플 데이터:\n` +
+                                        jsonData.recordList.slice(0, 3).map(r => `${r.currSgn}: ${r.fxrt}원`).join('\n');
+                                } else {
+                                    throw new Error('No data in response');
+                                }
+                            } catch (e) {
+                                throw new Error('파싱 실패: ' + e.message);
+                            }
+                        });
+                })
+                .catch(finalError => {
+                    showStatus('fallback-status', 'error', `모든 방법 실패: ${finalError.message}`);
+                    addLog(`최종 실패: ${finalError.message}`, 'error');
+                    document.getElementById('fallback-result').style.display = 'none';
+                });
+        }
+
+        // 페이지 로드 시 자동 실행
+        window.addEventListener('DOMContentLoaded', () => {
+            addLog('테스트 페이지 로드 완료', 'success');
+            addLog(`서비스 키 상태: ${CONFIG.SERVICE_KEY ? '설정됨' : '미설정'}`, CONFIG.SERVICE_KEY ? 'info' : 'warning');
+        });
+    </script>
+</body>
+</html>
