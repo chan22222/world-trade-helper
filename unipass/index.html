@@ -1167,54 +1167,89 @@
 
         // 웹 파싱 (실패 시 PHP 프록시 API로 폴백)
         function fetchRatesByParsingWithFallback(date) {
-            console.log('1️⃣ 웹 파싱 우선 시도');
+            console.log('1️⃣ PHP 프록시로 웹 파싱 우선 시도');
 
-            const pageIndex = 1;
-            const pageUnit = 100;
-            const weekFxrtTpcd = '2';  // 2: 수입
-            const timestamp = Date.now();
+            // PHP 프록시를 통해 UNIPASS 데이터 가져오기
+            const phpProxyUrl = `proxy_final.php?date=${date}`;
 
-            const unipassUrl = `https://unipass.customs.go.kr/csp/myc/bsopspptinfo/dclrSpptInfo/WeekFxrtQryCtr/retrieveWeekFxrt.do?pageIndex=${pageIndex}&pageUnit=${pageUnit}&aplyDt=${date}&weekFxrtTpcd=${weekFxrtTpcd}&undefined=${date}&_=${timestamp}`;
-
-            // 첫 번째 CORS 프록시로 빠르게 시도
-            const proxyUrl = `https://corsproxy.io/?url=${unipassUrl}`;
-
-            fetch(proxyUrl)
+            fetch(phpProxyUrl)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
+                        throw new Error(`PHP 프록시 실패: ${response.status}`);
                     }
-                    return response.text();
+                    return response.json(); // PHP 프록시는 JSON 반환
                 })
-                .then(text => {
-                    try {
-                        const jsonData = JSON.parse(text);
+                .then(jsonData => {
+                    console.log('📥 PHP 프록시 응답:', jsonData);
+
+                    // 에러 체크
+                    if (jsonData.error) {
+                        throw new Error(jsonData.message || 'PHP 프록시 에러');
+                    }
+
+                    // processJSONData와 호환되는 형식으로 처리
+                    // items 형식 (웹 파싱) 또는 recordList 형식 (API)
+                    if ((jsonData.items && jsonData.items.length > 0) ||
+                        (jsonData.recordList && jsonData.recordList.length > 0)) {
 
                         if (processJSONData(jsonData, date)) {
-                            console.log('✅ 웹 파싱 성공!');
+                            console.log('✅ PHP 프록시 웹 파싱 성공!');
                             console.groupEnd();
                             return;
                         }
-                        throw new Error('데이터 처리 실패');
-                    } catch (e) {
-                        throw new Error('JSON 파싱 실패: ' + e.message);
                     }
+
+                    throw new Error('데이터 처리 실패');
                 })
                 .catch(error => {
-                    console.warn('⚠️ 웹 파싱 실패:', error.message);
-                    console.log('2️⃣ PHP 프록시 API로 폴백...');
+                    console.warn('⚠️ PHP 프록시 웹 파싱 실패:', error.message);
+                    console.log('2️⃣ 일반 CORS 프록시로 재시도...');
 
-                    // 2순위: PHP 프록시 API 시도
-                    tryPhpProxyAPI(date);
+                    // 2순위: 일반 CORS 프록시 시도
+                    const pageIndex = 1;
+                    const pageUnit = 100;
+                    const weekFxrtTpcd = '2';  // 2: 수입
+                    const timestamp = Date.now();
+
+                    const unipassUrl = `https://unipass.customs.go.kr/csp/myc/bsopspptinfo/dclrSpptInfo/WeekFxrtQryCtr/retrieveWeekFxrt.do?pageIndex=${pageIndex}&pageUnit=${pageUnit}&aplyDt=${date}&weekFxrtTpcd=${weekFxrtTpcd}&undefined=${date}&_=${timestamp}`;
+                    const proxyUrl = `https://corsproxy.io/?url=${unipassUrl}`;
+
+                    fetch(proxyUrl)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+                            return response.text();
+                        })
+                        .then(text => {
+                            try {
+                                const jsonData = JSON.parse(text);
+
+                                if (processJSONData(jsonData, date)) {
+                                    console.log('✅ CORS 프록시 성공!');
+                                    console.groupEnd();
+                                    return;
+                                }
+                                throw new Error('데이터 처리 실패');
+                            } catch (e) {
+                                throw new Error('JSON 파싱 실패: ' + e.message);
+                            }
+                        })
+                        .catch(error2 => {
+                            console.warn('⚠️ CORS 프록시도 실패:', error2.message);
+                            console.log('3️⃣ XML API로 폴백...');
+
+                            // 3순위: PHP 프록시 API (XML) 시도
+                            tryPhpProxyAPI(date);
+                        });
                 });
         }
 
-        // PHP 프록시 API 호출
+        // PHP 프록시 API 호출 (공공데이터 API)
         function tryPhpProxyAPI(date) {
-            const dateStr = date.replace(/-/g, '');
             const serviceKey = CONFIG.SERVICE_KEY;
 
-            showStatus('loading', 'API로 재시도 중...');
+            showStatus('loading', '공공데이터 API로 재시도 중...');
 
             if (!serviceKey) {
                 console.warn('⚠️ 서비스 키 없음 - 다른 파싱 프록시 시도');
@@ -1223,29 +1258,39 @@
                 return;
             }
 
-            const phpProxyUrl = `proxy.php?date=${dateStr}&weekFxrtTpcd=2&serviceKey=${encodeURIComponent(serviceKey)}`;
+            // 새로운 proxy_api.php 사용
+            const phpProxyUrl = `proxy_api.php?date=${date}&weekFxrtTpcd=2&serviceKey=${encodeURIComponent(serviceKey)}`;
 
             fetch(phpProxyUrl)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`PHP 프록시 실패: ${response.status}`);
+                        throw new Error(`API 프록시 실패: ${response.status}`);
                     }
-                    return response.text();
+                    return response.json();
                 })
-                .then(text => {
-                    // PHP 파싱 에러 방지를 위해 문자열 분리
-                    const xmlStart = '<' + '?xml';
-                    if (text.includes(xmlStart) || text.includes('<response>')) {
-                        console.log('✅ PHP 프록시 API 성공!');
-                        processXMLData(text, date);
-                        console.groupEnd();
-                    } else {
-                        throw new Error('유효하지 않은 XML');
+                .then(data => {
+                    console.log('📥 공공데이터 API 응답:', data);
+
+                    if (data.error) {
+                        throw new Error(data.message || 'API 오류');
                     }
+
+                    // recordList가 있으면 처리
+                    if (data.recordList && data.recordList.length > 0) {
+                        console.log('✅ 공공데이터 API 성공!');
+
+                        // processJSONData 형식으로 처리
+                        if (processJSONData(data, date)) {
+                            console.groupEnd();
+                            return;
+                        }
+                    }
+
+                    throw new Error('API 데이터 처리 실패');
                 })
                 .catch(error => {
-                    console.warn('⚠️ PHP API도 실패:', error.message);
-                    console.log('3️⃣ 다른 파싱 프록시들 시도...');
+                    console.warn('⚠️ 공공데이터 API 실패:', error.message);
+                    console.log('4️⃣ 다른 파싱 프록시들 시도...');
 
                     // 마지막: 다른 파싱 프록시들 시도
                     fetchRatesByParsing(date);

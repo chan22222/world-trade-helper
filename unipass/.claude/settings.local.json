@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir \"C:\\Users\\CHAN2\\Music\\cord\\chan222k\\currency\\unipass\")"
+      "Bash(dir \"C:\\Users\\CHAN2\\Music\\cord\\chan222k\\currency\\unipass\")",
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd UNIPASS exchange rate calculator with secure config management\n\n- Add environment variable based config for API key security\n- Add detailed error debugging and logging\n- Add config.example.js template for easy setup\n- Add comprehensive README with installation guide\n- Update .gitignore to exclude sensitive config.js\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFix UNIPASS web parsing and improve UI alignment\n\n- Implement web parsing as primary method, API as fallback\n- Fix JSON parsing for UNIPASS web response (items structure)\n- Add PHP error prevention for XML string parsing\n- Fix form field alignment with flex-end\n- Add margin-bottom to API status messages\n- Apply same fixes to Hana Bank page\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git remote add:*)",
+      "Bash(touch:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
