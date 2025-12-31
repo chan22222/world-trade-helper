@@ -514,11 +514,72 @@
             color: #333;
         }
 
+        .currency-search-wrapper {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .currency-search-wrapper input {
+            width: 100%;
+            padding: 12px 40px 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .currency-search-wrapper input:focus {
+            outline: none;
+            border-color: #1e88e5;
+        }
+
+        .currency-search-clear {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #999;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .currency-search-clear:hover {
+            background: #666;
+        }
+
         .currency-checkboxes {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 10px;
-            margin-top: 15px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            align-content: start;
+        }
+
+        .currency-no-results {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .currency-section-divider {
+            grid-column: 1 / -1;
+            font-size: 11px;
+            color: #999;
+            padding: 10px 0 5px;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 5px;
         }
 
         .currency-checkbox-item {
@@ -621,6 +682,11 @@
                 <h2 class="modal-title">자주 쓰는 화폐 선택</h2>
                 <button class="modal-close-btn" onclick="closeCurrencyModal()">&times;</button>
             </div>
+            <!-- 검색창 -->
+            <div class="currency-search-wrapper">
+                <input type="text" id="currencySearch" placeholder="통화명 또는 코드 검색 (예: 달러, USD)" oninput="filterCurrencies()">
+                <button type="button" class="currency-search-clear" id="clearCurrencySearch" onclick="clearCurrencySearch()">×</button>
+            </div>
             <div id="currency-checkboxes" class="currency-checkboxes">
                 <!-- 동적으로 생성됨 -->
             </div>
@@ -667,6 +733,11 @@
             const modal = document.getElementById('currencyModal');
             modal.classList.remove('show');
             document.body.style.overflow = ''; // 스크롤 복원
+            // 검색어 초기화
+            const searchInput = document.getElementById('currencySearch');
+            if (searchInput) {
+                searchInput.value = '';
+            }
         }
 
         // 오버레이 클릭 시 모달 닫기
@@ -683,19 +754,61 @@
             }
         });
 
+        // 자주 쓰는 통화 목록
+        const POPULAR_CURRENCIES = ['USD', 'EUR', 'JPY', 'CNY', 'GBP', 'AUD', 'CAD', 'CHF', 'HKD', 'SGD', 'THB', 'VND', 'TWD', 'IDR', 'MYR', 'PHP', 'INR'];
+
         // 체크박스 렌더링
-        function renderCurrencyCheckboxes() {
+        function renderCurrencyCheckboxes(searchTerm = '') {
             const container = document.getElementById('currency-checkboxes');
+            const clearBtn = document.getElementById('clearCurrencySearch');
+
+            // X 버튼 표시/숨김
+            if (clearBtn) {
+                if (searchTerm) {
+                    clearBtn.style.display = 'flex';
+                } else {
+                    clearBtn.style.display = 'none';
+                }
+            }
 
             if (Object.keys(allCurrencies).length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">날짜를 선택하여 환율을 먼저 불러와주세요</p>';
+                container.innerHTML = '<p class="currency-no-results">날짜를 선택하여 환율을 먼저 불러와주세요</p>';
                 return;
             }
 
-            let html = '';
-            const sortedCurrencies = Object.keys(allCurrencies).sort();
+            // 검색어로 필터링
+            const search = searchTerm.toLowerCase();
+            let filteredCurrencies = Object.keys(allCurrencies).filter(code => {
+                if (!search) return true;
+                const name = getDetailedCurrencyName(code).toLowerCase();
+                return code.toLowerCase().includes(search) || name.includes(search);
+            });
 
-            sortedCurrencies.forEach(code => {
+            // 검색 결과 없음
+            if (filteredCurrencies.length === 0) {
+                container.innerHTML = '<p class="currency-no-results">검색 결과가 없습니다</p>';
+                return;
+            }
+
+            // 정렬: 자주 쓰는 통화 먼저, 나머지는 알파벳순
+            filteredCurrencies.sort((a, b) => {
+                const aPopular = POPULAR_CURRENCIES.indexOf(a);
+                const bPopular = POPULAR_CURRENCIES.indexOf(b);
+                if (aPopular !== -1 && bPopular !== -1) return aPopular - bPopular;
+                if (aPopular !== -1) return -1;
+                if (bPopular !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
+            let html = '';
+            const popularCount = POPULAR_CURRENCIES.filter(c => allCurrencies[c] && filteredCurrencies.includes(c)).length;
+
+            filteredCurrencies.forEach((code, index) => {
+                // 자주 쓰는 통화와 기타 통화 구분선
+                if (!searchTerm && index === popularCount) {
+                    html += '<div class="currency-section-divider">기타 통화</div>';
+                }
+
                 const detailedName = getDetailedCurrencyName(code);
                 const checked = selectedCurrencies.includes(code) ? 'checked' : '';
                 html += `
@@ -707,6 +820,20 @@
             });
 
             container.innerHTML = html;
+        }
+
+        // 검색 필터링
+        function filterCurrencies() {
+            const searchInput = document.getElementById('currencySearch');
+            renderCurrencyCheckboxes(searchInput.value);
+        }
+
+        // 검색어 초기화
+        function clearCurrencySearch() {
+            const searchInput = document.getElementById('currencySearch');
+            searchInput.value = '';
+            renderCurrencyCheckboxes('');
+            searchInput.focus();
         }
 
         // 체크박스 변경 시 처리
